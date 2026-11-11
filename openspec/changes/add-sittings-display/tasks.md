@@ -56,7 +56,7 @@
   - For `0m`, `59m`, `1h05`, `2h59`, `5h` and `23h`, the big text is centered within ±1 px, has at least 2 blank rows above and below, and stays inside the panel.
   - The message screens are still centered.
   - `uv run sittings --print` against the local API prints the new format.
-- [ ] 1.8 Add `bin/install-sittings-cron` (POSIX sh, executable) as design.md "`bin/install-sittings-cron`" describes, and change the README's cron section to use it, keeping the raw line as a fallback. Verify on the Mac without touching the real crontab: put a scratchpad stub `crontab` first on `PATH` that keeps its contents in a scratchpad file, then check that:
+- [x] 1.8 Add `bin/install-sittings-cron` (POSIX sh, executable) as design.md "`bin/install-sittings-cron`" describes, and change the README's cron section to use it, keeping the raw line as a fallback. Verify on the Mac without touching the real crontab: put a scratchpad stub `crontab` first on `PATH` that keeps its contents in a scratchpad file, then check that:
   - With no crontab yet, install adds exactly one tagged entry, with absolute `uv` and clone paths.
   - With an unrelated entry already present, install keeps it and adds one tagged entry.
   - Running install again still leaves exactly one tagged entry.
