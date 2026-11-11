@@ -10,7 +10,7 @@ The sitting tracker at `https://sitting.lviv.social/` already knows how long it 
   1. Reads the URL, username and password from `sittings.toml` in the repository root, which is gitignored and created by copying the committed `sittings.example.toml`. `--config PATH` overrides the location.
   2. Logs in with `POST /api/v1/login` and fetches today's status with `GET /api/v1/daily`.
   3. Draws one frame on the panel and leaves it there after exiting:
-     - A big number: the time since the last sitting. Under 3 hours it shows as `h:mm`. From 3 hours on it shows as whole hours, rounded down. Before the first sitting of the day, it shows the time since wakeup instead.
+     - A big number: the time since the last sitting, always with a unit letter. Under 1 hour it shows as `45m`, under 3 hours as `2h15`, and from 3 hours on as whole hours rounded down, like `5h`. Before the first sitting of the day, it shows the time since wakeup instead.
      - A smaller line underneath: `missing N`, where N is the server's `sittingDebt`, rounded down and never below 0.
 - When no wakeup has been logged today, draw `no wakeup` and exit 0.
 - When a run cannot get fresh data, overwrite the panel with a short error (`no network`, `login failed`, `server 502`, `bad response`, `no config`) and exit non-zero. A stale frame never stays on the panel looking current.

@@ -16,23 +16,31 @@ The project SHALL provide a `sittings` command that logs in to the sitting track
 - **AND** the command exits with status 0
 
 ### Requirement: Elapsed time format
-The elapsed time SHALL be shown as `h:mm` (hours without padding, minutes padded to two digits) when it is under 3 hours, and as whole hours rounded down, with no minutes, when it is 3 hours or more.
+The elapsed time SHALL always carry a unit letter. Under 1 hour it SHALL be shown as minutes followed by `m`. From 1 hour to under 3 hours it SHALL be shown as hours, `h`, then minutes padded to two digits. From 3 hours on it SHALL be shown as whole hours rounded down, followed by `h`.
 
-#### Scenario: Under three hours
+#### Scenario: Minutes only
 - **WHEN** the elapsed time is 0 h 5 min
-- **THEN** it is shown as `0:05`
+- **THEN** it is shown as `5m`
+
+#### Scenario: Just under an hour
+- **WHEN** the elapsed time is 0 h 59 min
+- **THEN** it is shown as `59m`
+
+#### Scenario: Hours and minutes
+- **WHEN** the elapsed time is 1 h 5 min
+- **THEN** it is shown as `1h05`
 
 #### Scenario: Just under three hours
 - **WHEN** the elapsed time is 2 h 59 min
-- **THEN** it is shown as `2:59`
+- **THEN** it is shown as `2h59`
 
 #### Scenario: Exactly three hours
 - **WHEN** the elapsed time is 3 h 0 min
-- **THEN** it is shown as `3`
+- **THEN** it is shown as `3h`
 
 #### Scenario: Hours are rounded down
 - **WHEN** the elapsed time is 5 h 47 min
-- **THEN** it is shown as `5`
+- **THEN** it is shown as `5h`
 
 ### Requirement: Missing sittings count
 The `missing N` line SHALL show the API's sitting debt rounded down to a whole number, and SHALL show 0 when the debt is negative.
@@ -54,7 +62,7 @@ When today has a wakeup but no sitting yet, the large number SHALL show the time
 
 #### Scenario: Morning before any sitting
 - **WHEN** today's wakeup was 1 h 40 min ago and no sitting has been logged today
-- **THEN** the large number shows `1:40`
+- **THEN** the large number shows `1h40`
 - **AND** the `missing N` line is still shown
 - **AND** the command exits with status 0
 

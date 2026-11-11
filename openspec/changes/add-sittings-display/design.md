@@ -76,7 +76,7 @@ load_config(path) --> fetch_daily(config) --> screen_for(daily) --> Screen
 ### Mapping the daily response to a screen
 1. `stats is null` → message `no wakeup`.
 2. `stats.timeSince` is `[h, m]` → elapsed = `h*60 + m` minutes. If it is `null` → elapsed = `stats.fromWakeupMins`.
-3. Format the elapsed minutes: under 180 → `f"{h}:{m:02d}"`, otherwise `f"{h}"` (rounded down by integer division).
+3. Format the elapsed minutes so every value carries a unit: under 60 → `f"{minutes}m"`, under 180 → `f"{h}h{m:02d}"`, otherwise `f"{h}h"` (rounded down by integer division). The first version used `h:mm` and a bare `h`. On the panel a bare `5` couldn't be told apart from minutes, so the units were added after the first on-device run.
 4. missing = `max(0, math.floor(stats.sittingDebt))`.
 
 - *Observed (task 2.1, local dev server)*: with a wakeup set 1 h 40 min earlier, `fromWakeupMins` was 100 and `timeSince` was `null`. Right after logging a sitting, `timeSince` was `[0, 0]` and `lastTime` was `[14, 54]`, the clock time of that sitting. So `timeSince` is the elapsed `[hours, minutes]` and `lastTime` is the clock time. The sitting moved `sittingDebt` from 1.8 to 0.7.
@@ -88,19 +88,22 @@ load_config(path) --> fetch_daily(config) --> screen_for(daily) --> Screen
 +----------------------------+
 |since                       |  12 px DejaVu, top-left
 |                            |
-|          2:15              |  big DejaVu, centered by ink bbox
+|          2h15              |  big DejaVu, centered by ink bbox
 |                            |  in the band between the two lines
 |missing 2                   |  12 px DejaVu, bottom-left
 +----------------------------+
 ```
 
-- Big font size: the largest integer size at which `"0:00"` (DejaVu digits all have the same width, so this is the widest string) has an ink width of at most 124 px, *and* its ink height fits between the label and the bottom line with a gap of at least 2 px on each side. *Measured (task 1.3, 1-bit rendering)*: the `since` label's ink takes rows 0–8 and `missing N` takes rows 52–63, so the big text's ink can be at most 39 rows tall. The chosen size is **51 px**. At that size `"0:00"` is 107x39 px of ink and sits on rows 11–49, leaving 2 blank rows above and below. 52 px would be 40 rows tall.
+- Big font size: the largest integer size at which the widest elapsed string has an ink width of at most 124 px, *and* its ink height fits between the label and the bottom line with a gap of at least 2 px on each side. The `since` label's ink takes rows 0–8 and `missing N` takes rows 52–63, so the big text's ink can be at most 39 rows tall.
+  - *Measured (task 1.7, 1-bit rendering)*: the widest string is `2h59`, and the `h` ascender rises a row above the digits. The chosen size is **50 px**, where `2h59` is 120x39 px of ink with 2 blank rows above and below. At 51 px it would be 40 rows tall.
+  - The first `h:mm` version (task 1.3) fitted `"0:00"` at 51 px.
+- Every element is placed by its real 1-bit ink box, measured by rendering into a scratch image, not by `textbbox`. `textbbox` measures the anti-aliased outline, and 1-bit glyphs can end 1–2 px short of it, which made `0m` sit 1.5 px off-centre.
 - Message screens (`no wakeup`, errors) show one line at 15 px, centered, the same as the final `splash` text. `bad response` is the longest and fits easily.
 - `draw.fontmode = "1"` and loading through `importlib.resources`, both as in `splash`. The font is shared by reading the same `fonts/DejaVuSans.ttf`. Nothing is extracted into a common module yet; two call sites don't justify it.
 - The `since` label stays the same before the first sitting (when the time counts from wakeup). The spec chose a layout that keeps the same shape all day.
 
 ### CLI
-`argparse` with `--config PATH` and `--print`. `--config` defaults to `Path("sittings.toml")`, relative to the working directory. `--print` writes `lines(screen)` to stdout, either `since 2:15` + `missing 2` or the single message. It never constructs the device. On success, nothing is written to stdout unless `--print` is given, so cron stays quiet.
+`argparse` with `--config PATH` and `--print`. `--config` defaults to `Path("sittings.toml")`, relative to the working directory. `--print` writes `lines(screen)` to stdout, either `since 2h15` + `missing 2` or the single message. It never constructs the device. On success, nothing is written to stdout unless `--print` is given, so cron stays quiet.
 
 ### Cron entry (documented in the README)
 

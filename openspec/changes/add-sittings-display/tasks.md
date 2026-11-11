@@ -51,6 +51,12 @@
   - With a `sittings.toml` in the repository root pointing at the local API, `uv run sittings --print` with no `--config` prints the status.
   - The crontab form `uv run --quiet --directory <clone> sittings --print` works from outside the clone.
 
+- [x] 1.7 Add unit letters to the elapsed time (`5m`, `1h05`, `2h59`, `3h`, `5h`) as in the spec's "Elapsed time format". Re-pick the big font size for `2h59`, and place every element by its 1-bit ink box (design.md "Layout on the 128x64 panel"). Verify with `.venv/bin/python -c`:
+  - `format_elapsed` gives `0m`, `5m`, `59m`, `1h00`, `1h05`, `2h59`, `3h`, `5h` and `23h` for 0, 5, 59, 60, 65, 179, 180, 347 and 1439 minutes.
+  - For `0m`, `59m`, `1h05`, `2h59`, `5h` and `23h`, the big text is centered within ±1 px, has at least 2 blank rows above and below, and stays inside the panel.
+  - The message screens are still centered.
+  - `uv run sittings --print` against the local API prints the new format.
+
 ## 2. Live API check (needs the API deployed)
 
 - [x] 2.1 The user provides credentials for a reachable API on the Mac (done against the local dev server at `http://localhost:3010`). If the API is not reachable yet, stop and ask the user. Run a scratchpad probe script that reads the config file itself (the password never goes on a command line or into output) and checks the following:
