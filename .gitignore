@@ -8,3 +8,6 @@ wheels/
 
 # Virtual environments
 .venv/
+
+# A filled-in copy of sittings.example.toml holds credentials
+/sittings.toml

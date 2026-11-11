@@ -1,0 +1,10 @@
+# Config for `uv run sittings`.
+#
+# Copy it to sittings.toml in the repository root (gitignored), chmod 600, then
+# fill in your credentials there (see the README's "Sitting status" section).
+
+# Base URL of the sitting tracker. Keep https:// so the login isn't redirected.
+url = "https://sitting.lviv.social"
+
+username = "your-username"
+password = "your-password"
