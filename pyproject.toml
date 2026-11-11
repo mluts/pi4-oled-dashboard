@@ -13,6 +13,7 @@ dependencies = [
 
 [project.scripts]
 hello = "pi_ssd1306_dashboard:main"
+splash = "pi_ssd1306_dashboard.splash:main"
 
 [build-system]
 requires = ["uv_build>=0.13.7,<0.14.0"]
