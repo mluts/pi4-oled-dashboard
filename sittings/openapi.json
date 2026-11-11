@@ -1,0 +1,1275 @@
+{
+  "info": {
+    "title": "Sitting API",
+    "version": "1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/daily": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "lastSittingGoal": {
+                      "oneOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "settings": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "preferredColor": {
+                          "type": "string"
+                        },
+                        "preferredLang": {
+                          "type": "string"
+                        },
+                        "preferredTheme": {
+                          "type": "string"
+                        },
+                        "sittingDuration": {
+                          "type": "integer"
+                        },
+                        "sittingInterleaving": {
+                          "type": "boolean"
+                        },
+                        "sittingInterleavingGap": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "sittingDuration",
+                        "sittingInterleaving",
+                        "sittingInterleavingGap",
+                        "preferredLang",
+                        "preferredTheme",
+                        "preferredColor"
+                      ],
+                      "type": "object"
+                    },
+                    "sittings": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "at": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "sittingId": {
+                            "type": "integer"
+                          },
+                          "sittingsN": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "sittingId",
+                          "sittingsN",
+                          "at"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "stats": {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "countdownMins": {
+                              "oneOf": [
+                                {
+                                  "type": "integer"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "fromWakeupMins": {
+                              "type": "integer"
+                            },
+                            "lastTime": {
+                              "oneOf": [
+                                {
+                                  "items": false,
+                                  "prefixItems": [
+                                    {
+                                      "type": "integer"
+                                    },
+                                    {
+                                      "type": "integer"
+                                    }
+                                  ],
+                                  "type": "array"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "nSittings": {
+                              "type": "integer"
+                            },
+                            "ratioGoal": {
+                              "type": "integer"
+                            },
+                            "sittedMins": {
+                              "type": "integer"
+                            },
+                            "sittingDebt": {
+                              "type": "number"
+                            },
+                            "timeSince": {
+                              "oneOf": [
+                                {
+                                  "items": false,
+                                  "prefixItems": [
+                                    {
+                                      "type": "integer"
+                                    },
+                                    {
+                                      "type": "integer"
+                                    }
+                                  ],
+                                  "type": "array"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "toSitMax": {
+                              "type": "integer"
+                            },
+                            "toSitMaxFlt": {
+                              "type": "number"
+                            },
+                            "toSitTimes": {
+                              "type": "number"
+                            },
+                            "unsittedMins": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "nSittings",
+                            "toSitMax",
+                            "toSitMaxFlt",
+                            "toSitTimes",
+                            "sittingDebt",
+                            "countdownMins",
+                            "ratioGoal",
+                            "fromWakeupMins",
+                            "sittedMins",
+                            "unsittedMins",
+                            "timeSince",
+                            "lastTime"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "wakeup": {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "createdAt": {
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            "sittingGoal": {
+                              "type": "integer"
+                            },
+                            "updatedAt": {
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            "wakeupDate": {
+                              "format": "date",
+                              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                              "type": "string"
+                            },
+                            "wakeupTime": {
+                              "pattern": "^\\d{2}:\\d{2}:\\d{2}$",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "wakeupDate",
+                            "wakeupTime",
+                            "sittingGoal",
+                            "createdAt",
+                            "updatedAt"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "wakeup",
+                    "sittings",
+                    "settings",
+                    "stats",
+                    "lastSittingGoal"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/login": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "password": {
+                    "type": "string"
+                  },
+                  "username": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "username",
+                  "password"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "username": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "token",
+                    "username"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "preferredColor": {
+                      "type": "string"
+                    },
+                    "preferredLang": {
+                      "type": "string"
+                    },
+                    "preferredTheme": {
+                      "type": "string"
+                    },
+                    "sittingDuration": {
+                      "type": "integer"
+                    },
+                    "sittingInterleaving": {
+                      "type": "boolean"
+                    },
+                    "sittingInterleavingGap": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "sittingDuration",
+                    "sittingInterleaving",
+                    "sittingInterleavingGap",
+                    "preferredLang",
+                    "preferredTheme",
+                    "preferredColor"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "preferredColor": {
+                    "enum": [
+                      "amber",
+                      "azure",
+                      "blue",
+                      "cyan",
+                      "fuchsia",
+                      "green",
+                      "grey",
+                      "indigo",
+                      "jade",
+                      "lime",
+                      "orange",
+                      "pink",
+                      "pumpkin",
+                      "purple",
+                      "red",
+                      "sand",
+                      "slate",
+                      "violet",
+                      "yellow",
+                      "zinc"
+                    ],
+                    "type": "string"
+                  },
+                  "preferredLang": {
+                    "enum": [
+                      "browser",
+                      "uk",
+                      "en"
+                    ],
+                    "type": "string"
+                  },
+                  "preferredTheme": {
+                    "enum": [
+                      "browser",
+                      "light",
+                      "dark"
+                    ],
+                    "type": "string"
+                  },
+                  "sittingDuration": {
+                    "maximum": 3600,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "sittingInterleaving": {
+                    "type": "boolean"
+                  },
+                  "sittingInterleavingGap": {
+                    "maximum": 3600,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "preferredColor": {
+                      "type": "string"
+                    },
+                    "preferredLang": {
+                      "type": "string"
+                    },
+                    "preferredTheme": {
+                      "type": "string"
+                    },
+                    "sittingDuration": {
+                      "type": "integer"
+                    },
+                    "sittingInterleaving": {
+                      "type": "boolean"
+                    },
+                    "sittingInterleavingGap": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "sittingDuration",
+                    "sittingInterleaving",
+                    "sittingInterleavingGap",
+                    "preferredLang",
+                    "preferredTheme",
+                    "preferredColor"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sittings": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "count": {
+                    "enum": [
+                      1,
+                      2
+                    ],
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "count"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "lastSittingGoal": {
+                      "oneOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "settings": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "preferredColor": {
+                          "type": "string"
+                        },
+                        "preferredLang": {
+                          "type": "string"
+                        },
+                        "preferredTheme": {
+                          "type": "string"
+                        },
+                        "sittingDuration": {
+                          "type": "integer"
+                        },
+                        "sittingInterleaving": {
+                          "type": "boolean"
+                        },
+                        "sittingInterleavingGap": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "sittingDuration",
+                        "sittingInterleaving",
+                        "sittingInterleavingGap",
+                        "preferredLang",
+                        "preferredTheme",
+                        "preferredColor"
+                      ],
+                      "type": "object"
+                    },
+                    "sittings": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "at": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "sittingId": {
+                            "type": "integer"
+                          },
+                          "sittingsN": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "sittingId",
+                          "sittingsN",
+                          "at"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "stats": {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "countdownMins": {
+                              "oneOf": [
+                                {
+                                  "type": "integer"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "fromWakeupMins": {
+                              "type": "integer"
+                            },
+                            "lastTime": {
+                              "oneOf": [
+                                {
+                                  "items": false,
+                                  "prefixItems": [
+                                    {
+                                      "type": "integer"
+                                    },
+                                    {
+                                      "type": "integer"
+                                    }
+                                  ],
+                                  "type": "array"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "nSittings": {
+                              "type": "integer"
+                            },
+                            "ratioGoal": {
+                              "type": "integer"
+                            },
+                            "sittedMins": {
+                              "type": "integer"
+                            },
+                            "sittingDebt": {
+                              "type": "number"
+                            },
+                            "timeSince": {
+                              "oneOf": [
+                                {
+                                  "items": false,
+                                  "prefixItems": [
+                                    {
+                                      "type": "integer"
+                                    },
+                                    {
+                                      "type": "integer"
+                                    }
+                                  ],
+                                  "type": "array"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "toSitMax": {
+                              "type": "integer"
+                            },
+                            "toSitMaxFlt": {
+                              "type": "number"
+                            },
+                            "toSitTimes": {
+                              "type": "number"
+                            },
+                            "unsittedMins": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "nSittings",
+                            "toSitMax",
+                            "toSitMaxFlt",
+                            "toSitTimes",
+                            "sittingDebt",
+                            "countdownMins",
+                            "ratioGoal",
+                            "fromWakeupMins",
+                            "sittedMins",
+                            "unsittedMins",
+                            "timeSince",
+                            "lastTime"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "wakeup": {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "createdAt": {
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            "sittingGoal": {
+                              "type": "integer"
+                            },
+                            "updatedAt": {
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            "wakeupDate": {
+                              "format": "date",
+                              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                              "type": "string"
+                            },
+                            "wakeupTime": {
+                              "pattern": "^\\d{2}:\\d{2}:\\d{2}$",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "wakeupDate",
+                            "wakeupTime",
+                            "sittingGoal",
+                            "createdAt",
+                            "updatedAt"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "wakeup",
+                    "sittings",
+                    "settings",
+                    "stats",
+                    "lastSittingGoal"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sittings/{sittingId}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sittingId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "lastSittingGoal": {
+                      "oneOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "settings": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "preferredColor": {
+                          "type": "string"
+                        },
+                        "preferredLang": {
+                          "type": "string"
+                        },
+                        "preferredTheme": {
+                          "type": "string"
+                        },
+                        "sittingDuration": {
+                          "type": "integer"
+                        },
+                        "sittingInterleaving": {
+                          "type": "boolean"
+                        },
+                        "sittingInterleavingGap": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "sittingDuration",
+                        "sittingInterleaving",
+                        "sittingInterleavingGap",
+                        "preferredLang",
+                        "preferredTheme",
+                        "preferredColor"
+                      ],
+                      "type": "object"
+                    },
+                    "sittings": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "at": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "sittingId": {
+                            "type": "integer"
+                          },
+                          "sittingsN": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "sittingId",
+                          "sittingsN",
+                          "at"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "stats": {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "countdownMins": {
+                              "oneOf": [
+                                {
+                                  "type": "integer"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "fromWakeupMins": {
+                              "type": "integer"
+                            },
+                            "lastTime": {
+                              "oneOf": [
+                                {
+                                  "items": false,
+                                  "prefixItems": [
+                                    {
+                                      "type": "integer"
+                                    },
+                                    {
+                                      "type": "integer"
+                                    }
+                                  ],
+                                  "type": "array"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "nSittings": {
+                              "type": "integer"
+                            },
+                            "ratioGoal": {
+                              "type": "integer"
+                            },
+                            "sittedMins": {
+                              "type": "integer"
+                            },
+                            "sittingDebt": {
+                              "type": "number"
+                            },
+                            "timeSince": {
+                              "oneOf": [
+                                {
+                                  "items": false,
+                                  "prefixItems": [
+                                    {
+                                      "type": "integer"
+                                    },
+                                    {
+                                      "type": "integer"
+                                    }
+                                  ],
+                                  "type": "array"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "toSitMax": {
+                              "type": "integer"
+                            },
+                            "toSitMaxFlt": {
+                              "type": "number"
+                            },
+                            "toSitTimes": {
+                              "type": "number"
+                            },
+                            "unsittedMins": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "nSittings",
+                            "toSitMax",
+                            "toSitMaxFlt",
+                            "toSitTimes",
+                            "sittingDebt",
+                            "countdownMins",
+                            "ratioGoal",
+                            "fromWakeupMins",
+                            "sittedMins",
+                            "unsittedMins",
+                            "timeSince",
+                            "lastTime"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "wakeup": {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "createdAt": {
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            "sittingGoal": {
+                              "type": "integer"
+                            },
+                            "updatedAt": {
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            "wakeupDate": {
+                              "format": "date",
+                              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                              "type": "string"
+                            },
+                            "wakeupTime": {
+                              "pattern": "^\\d{2}:\\d{2}:\\d{2}$",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "wakeupDate",
+                            "wakeupTime",
+                            "sittingGoal",
+                            "createdAt",
+                            "updatedAt"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "wakeup",
+                    "sittings",
+                    "settings",
+                    "stats",
+                    "lastSittingGoal"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stats": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "daily": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "date": {
+                            "format": "date",
+                            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                            "type": "string"
+                          },
+                          "sittings": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "date",
+                          "sittings"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "periods": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "days": {
+                            "type": "integer"
+                          },
+                          "sittedMins": {
+                            "type": "integer"
+                          },
+                          "sittedMinsDelta": {
+                            "type": "integer"
+                          },
+                          "sittings": {
+                            "type": "integer"
+                          },
+                          "sittingsDelta": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "days",
+                          "sittings",
+                          "sittingsDelta",
+                          "sittedMins",
+                          "sittedMinsDelta"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "periods",
+                    "daily"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wakeup": {
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "sittingGoal": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "wakeupTime": {
+                    "pattern": "^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?(?![\\s\\S])",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "wakeupTime"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "lastSittingGoal": {
+                      "oneOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "settings": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "preferredColor": {
+                          "type": "string"
+                        },
+                        "preferredLang": {
+                          "type": "string"
+                        },
+                        "preferredTheme": {
+                          "type": "string"
+                        },
+                        "sittingDuration": {
+                          "type": "integer"
+                        },
+                        "sittingInterleaving": {
+                          "type": "boolean"
+                        },
+                        "sittingInterleavingGap": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "sittingDuration",
+                        "sittingInterleaving",
+                        "sittingInterleavingGap",
+                        "preferredLang",
+                        "preferredTheme",
+                        "preferredColor"
+                      ],
+                      "type": "object"
+                    },
+                    "sittings": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "at": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "sittingId": {
+                            "type": "integer"
+                          },
+                          "sittingsN": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "sittingId",
+                          "sittingsN",
+                          "at"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "stats": {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "countdownMins": {
+                              "oneOf": [
+                                {
+                                  "type": "integer"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "fromWakeupMins": {
+                              "type": "integer"
+                            },
+                            "lastTime": {
+                              "oneOf": [
+                                {
+                                  "items": false,
+                                  "prefixItems": [
+                                    {
+                                      "type": "integer"
+                                    },
+                                    {
+                                      "type": "integer"
+                                    }
+                                  ],
+                                  "type": "array"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "nSittings": {
+                              "type": "integer"
+                            },
+                            "ratioGoal": {
+                              "type": "integer"
+                            },
+                            "sittedMins": {
+                              "type": "integer"
+                            },
+                            "sittingDebt": {
+                              "type": "number"
+                            },
+                            "timeSince": {
+                              "oneOf": [
+                                {
+                                  "items": false,
+                                  "prefixItems": [
+                                    {
+                                      "type": "integer"
+                                    },
+                                    {
+                                      "type": "integer"
+                                    }
+                                  ],
+                                  "type": "array"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "toSitMax": {
+                              "type": "integer"
+                            },
+                            "toSitMaxFlt": {
+                              "type": "number"
+                            },
+                            "toSitTimes": {
+                              "type": "number"
+                            },
+                            "unsittedMins": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "nSittings",
+                            "toSitMax",
+                            "toSitMaxFlt",
+                            "toSitTimes",
+                            "sittingDebt",
+                            "countdownMins",
+                            "ratioGoal",
+                            "fromWakeupMins",
+                            "sittedMins",
+                            "unsittedMins",
+                            "timeSince",
+                            "lastTime"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "wakeup": {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "createdAt": {
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            "sittingGoal": {
+                              "type": "integer"
+                            },
+                            "updatedAt": {
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            "wakeupDate": {
+                              "format": "date",
+                              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                              "type": "string"
+                            },
+                            "wakeupTime": {
+                              "pattern": "^\\d{2}:\\d{2}:\\d{2}$",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "wakeupDate",
+                            "wakeupTime",
+                            "sittingGoal",
+                            "createdAt",
+                            "updatedAt"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "wakeup",
+                    "sittings",
+                    "settings",
+                    "stats",
+                    "lastSittingGoal"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-id": [
+    "mlu.sitting.web.routes.api/api"
+  ]
+}
