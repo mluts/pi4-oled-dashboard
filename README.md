@@ -127,7 +127,27 @@ The details of each error go to stderr, with a timestamp.
 
 ### Refresh every minute with cron
 
-Open your crontab with `crontab -e` and add:
+Once `sittings.toml` is in place, run this once from the repository root:
+
+```sh
+bin/install-sittings-cron
+```
+
+It adds a crontab entry that runs `sittings` every minute from this clone, and prints the entry. The entry uses absolute paths to `uv` and the clone, so cron's minimal `PATH` doesn't matter. Running the script again replaces its own entry rather than adding a second one, for example after moving the clone. It leaves the rest of your crontab alone. If `sittings.toml` is missing, the script refuses to install.
+
+To remove the entry:
+
+```sh
+bin/install-sittings-cron --uninstall
+```
+
+A successful run writes nothing. Errors are appended to `~/sittings.log`, one line per failed run.
+
+After a `git pull`, the next cron run picks up the new code and dependencies by itself.
+
+#### Without the script
+
+To add the entry by hand instead, open your crontab with `crontab -e` and add:
 
 ```
 * * * * * $HOME/.local/bin/uv run --quiet --directory $HOME/pi4-oled-dashboard sittings 2>>$HOME/sittings.log
@@ -135,9 +155,8 @@ Open your crontab with `crontab -e` and add:
 
 - Cron doesn't have `~/.local/bin` on its `PATH`, so the line calls `uv` by its full path.
 - `--directory` runs the command from inside the clone, so it finds both the project and `sittings.toml`. Adjust the path if you cloned somewhere else.
-- A successful run writes nothing. Errors are appended to `~/sittings.log`, one line per failed run.
 
-After a `git pull`, the next cron run picks up the new code and dependencies by itself.
+Don't use both methods: the script only replaces entries it added itself.
 
 ## Dev loop
 
