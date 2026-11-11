@@ -2,7 +2,7 @@
 
 A small OLED dashboard for a Raspberry Pi, built on [luma.oled](https://github.com/rm-hull/luma.oled) and managed with [uv](https://docs.astral.sh/uv/).
 
-For now it has two test commands: `hello` draws "hello world", and `splash` plays a short animation that ends on a Cyrillic greeting.
+It has two test commands: `hello` draws "hello world", and `splash` plays a short animation that ends on a Cyrillic greeting. Its first real screen is `sittings`, which shows the status from the [sitting tracker](https://sitting.lviv.social/) and is refreshed by cron every minute.
 
 ## Hardware
 
@@ -72,6 +72,72 @@ The Pi's I2C bus runs at 100 kHz by default, which limits the panel to about 10 
 ```
 dtparam=i2c_arm_baudrate=400000
 ```
+
+## Sitting status
+
+`sittings` logs in to the sitting tracker, fetches today's status, draws it on the panel and exits.
+
+### Config
+
+The credentials live in `sittings.toml` in the repository root. Git ignores that file, so it can't be committed. Create it from the example, then fill in your username and password:
+
+```sh
+cp sittings.example.toml sittings.toml
+chmod 600 sittings.toml
+nano sittings.toml
+```
+
+`sittings` looks for `sittings.toml` in the current directory, so run it from the repository root. To read a different file, pass `--config PATH`.
+
+### Run
+
+```sh
+uv run sittings
+```
+
+To check it without a panel, for example on a Mac, print the status to the terminal instead:
+
+```sh
+uv run sittings --print
+```
+
+### What the panel shows
+
+```
+since
+ 2:15
+missing 2
+```
+
+- **The big number** is the time since your last sitting: `h:mm` under 3 hours, then whole hours (`5` means 5 to 6 hours). Before the first sitting of the day it counts from wakeup instead.
+- **`missing N`** is how many sittings you are behind today's goal, rounded down and never below 0.
+- **`no wakeup`** means no wakeup has been logged today.
+
+If a run can't get the status, the panel shows a short error instead of the old numbers, and the command exits with a non-zero status:
+
+| Panel text     | Meaning                                                |
+|----------------|--------------------------------------------------------|
+| `no config`    | The config file is missing or lacks a key              |
+| `no network`   | The server can't be reached or didn't answer in time   |
+| `login failed` | The server rejected the username or password           |
+| `server 502`   | The server returned an error status (here 502)         |
+| `bad response` | The server's reply wasn't what `sittings` expects      |
+
+The details of each error go to stderr, with a timestamp.
+
+### Refresh every minute with cron
+
+Open your crontab with `crontab -e` and add:
+
+```
+* * * * * $HOME/.local/bin/uv run --quiet --directory $HOME/pi4-oled-dashboard sittings 2>>$HOME/sittings.log
+```
+
+- Cron doesn't have `~/.local/bin` on its `PATH`, so the line calls `uv` by its full path.
+- `--directory` runs the command from inside the clone, so it finds both the project and `sittings.toml`. Adjust the path if you cloned somewhere else.
+- A successful run writes nothing. Errors are appended to `~/sittings.log`, one line per failed run.
+
+After a `git pull`, the next cron run picks up the new code and dependencies by itself.
 
 ## Dev loop
 
