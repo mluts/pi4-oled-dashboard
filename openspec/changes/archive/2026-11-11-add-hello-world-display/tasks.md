@@ -15,8 +15,8 @@
 
 ## 3. On-device verification (performed by the user on the Pi)
 
-- [ ] 3.1 Push the branch, then on the Pi run `git clone` (or `git pull`) followed by `uv run hello`. Verify that the command exits 0 and that "hello world" is fully visible and centred on the panel.
-- [ ] 3.2 After the command from 3.1 has returned to the shell prompt, look at the panel. Verify that "hello world" is still shown, which checks the persistence requirement.
+- [x] 3.1 Push the branch, then on the Pi run `git clone` (or `git pull`) followed by `uv run hello`. Verify that the command exits 0 and that "hello world" is fully visible and centred on the panel.
+- [x] 3.2 After the command from 3.1 has returned to the shell prompt, look at the panel. Verify that "hello world" is still shown, which checks the persistence requirement.
 
 ## Workflow follow-up
 
