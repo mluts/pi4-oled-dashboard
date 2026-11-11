@@ -105,11 +105,11 @@ uv run sittings --print
 
 ```
 since
- 2:15
+ 2h15
 missing 2
 ```
 
-- **The big number** is the time since your last sitting: `h:mm` under 3 hours, then whole hours (`5` means 5 to 6 hours). Before the first sitting of the day it counts from wakeup instead.
+- **The big number** is the time since your last sitting, always with a unit letter: `45m` under an hour, `2h15` under 3 hours, then whole hours (`5h` means 5 to 6 hours). Before the first sitting of the day it counts from wakeup instead.
 - **`missing N`** is how many sittings you are behind today's goal, rounded down and never below 0.
 - **`no wakeup`** means no wakeup has been logged today.
 
