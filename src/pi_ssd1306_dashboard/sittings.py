@@ -186,6 +186,18 @@ def lines(screen: Screen) -> list[str]:
     return [f"since {screen.elapsed}", f"missing {screen.missing}"]
 
 
+def _ink_bbox(text: str, font: ImageFont.FreeTypeFont) -> tuple[int, int, int, int]:
+    # NOTE: textbbox measures the anti-aliased outline; 1-bit glyphs can end a pixel
+    # or two short of it, which shows as off-centre big text. Measure real ink.
+    origin = 32
+    scratch = Image.new("1", (WIDTH * 2, HEIGHT * 2))
+    draw = ImageDraw.Draw(scratch)
+    draw.fontmode = "1"
+    draw.text((origin, origin), text, font=font, fill="white")
+    left, top, right, bottom = scratch.getbbox()
+    return left - origin, top - origin, right - origin, bottom - origin
+
+
 def render(screen: Screen) -> Image.Image:
     image = Image.new("1", (WIDTH, HEIGHT))
     draw = ImageDraw.Draw(image)
@@ -194,7 +206,7 @@ def render(screen: Screen) -> Image.Image:
 
     if isinstance(screen, Message):
         font = FONTS[MESSAGE_FONT_SIZE]
-        left, top, right, bottom = draw.textbbox((0, 0), screen.text, font=font)
+        left, top, right, bottom = _ink_bbox(screen.text, font)
         x = (WIDTH - (right - left)) // 2 - left
         y = (HEIGHT - (bottom - top)) // 2 - top
         draw.text((x, y), screen.text, font=font, fill="white")
@@ -204,17 +216,17 @@ def render(screen: Screen) -> Image.Image:
 
     # NOTE: the label's ink sits on the top edge, the bottom line's on the bottom edge.
     label = "since"
-    left, top, right, bottom = draw.textbbox((0, 0), label, font=small)
+    left, top, right, bottom = _ink_bbox(label, small)
     draw.text((-left, -top), label, font=small, fill="white")
     band_top = bottom - top
 
     missing = f"missing {screen.missing}"
-    left, top, right, bottom = draw.textbbox((0, 0), missing, font=small)
+    left, top, right, bottom = _ink_bbox(missing, small)
     draw.text((-left, HEIGHT - bottom), missing, font=small, fill="white")
     band_bottom = HEIGHT - (bottom - top)
 
     big = FONTS[BIG_FONT_SIZE]
-    left, top, right, bottom = draw.textbbox((0, 0), screen.elapsed, font=big)
+    left, top, right, bottom = _ink_bbox(screen.elapsed, big)
     x = (WIDTH - (right - left)) // 2 - left
     y = band_top + (band_bottom - band_top - (bottom - top)) // 2 - top
     draw.text((x, y), screen.elapsed, font=big, fill="white")
