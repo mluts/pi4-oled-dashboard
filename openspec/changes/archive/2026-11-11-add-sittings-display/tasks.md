@@ -79,12 +79,12 @@
 
 ## 3. On-device verification (performed by the user on the Pi)
 
-- [ ] 3.1 On the Pi, run `git pull`, create the config file as described in the README (with `chmod 600`), and run `uv run sittings`. Verify that the panel shows the big time and the `missing N` line, that the command exits 0, and that the frame stays on the panel after the prompt returns.
-- [ ] 3.2 Run `bin/install-sittings-cron`. If you added the raw line by hand earlier, remove it first with `crontab -e` so the job doesn't run twice. Verify that:
+- [x] 3.1 On the Pi, run `git pull`, create the config file as described in the README (with `chmod 600`), and run `uv run sittings`. Verify that the panel shows the big time and the `missing N` line, that the command exits 0, and that the frame stays on the panel after the prompt returns.
+- [x] 3.2 Run `bin/install-sittings-cron`. If you added the raw line by hand earlier, remove it first with `crontab -e` so the job doesn't run twice. Verify that:
   - `crontab -l` shows exactly one `sittings` entry.
   - Over the next 2–3 minutes the time on the panel updates without any manual run.
   - `$HOME/sittings.log` stays empty.
-- [ ] 3.3 Temporarily change `url` in the Pi's config file to an unresolvable host, for example `https://sitting.invalid`. Verify that within a minute the panel shows `no network` and `$HOME/sittings.log` gets a line about it. Then restore the URL and verify that the status returns on the next run. (`bin/install-sittings-cron --uninstall` removes the job if you ever need to stop it.)
+- [x] 3.3 Temporarily change `url` in the Pi's config file to an unresolvable host, for example `https://sitting.invalid`. Verify that within a minute the panel shows `no network` and `$HOME/sittings.log` gets a line about it. Then restore the URL and verify that the status returns on the next run. (`bin/install-sittings-cron --uninstall` removes the job if you ever need to stop it.)
 
 ## Workflow follow-up
 
