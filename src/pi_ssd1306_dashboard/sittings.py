@@ -30,13 +30,12 @@ REQUEST_TIMEOUT = 10
 # whole fetch so runs started every minute by cron never overlap.
 DEADLINE_SECONDS = 25
 
-SMALL_FONT_SIZE = 12
 MESSAGE_FONT_SIZE = 15
+SMALL_FONT_SIZE = 17
 # NOTE: largest size where "2h59" (widest, and "h" rises above the digits) fits
 # 124 px wide and leaves 2 px gaps to the label and the bottom line (1-bit ink:
 # 120x39 px).
-BIG_FONT_SIZE = 50
-
+BIG_FONT_SIZE = 30
 _FONT_DATA = (files(__package__) / "fonts" / "DejaVuSans.ttf").read_bytes()
 # NOTE: Pillow reads a file object to the end, so each size gets its own stream.
 FONTS = {
