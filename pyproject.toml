@@ -1,0 +1,19 @@
+[project]
+name = "pi-ssd1306-dashboard"
+version = "0.1.0"
+description = "SSD1306 OLED dashboard for Raspberry Pi"
+readme = "README.md"
+authors = [
+    { name = "Michael Lutsiuk", email = "michael.lutsiuk@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "luma-oled>=3.16.0",
+]
+
+[project.scripts]
+hello = "pi_ssd1306_dashboard:main"
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
