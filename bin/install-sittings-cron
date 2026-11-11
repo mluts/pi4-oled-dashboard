@@ -13,14 +13,25 @@ usage() {
 }
 
 # NOTE: `crontab -l` fails when the user has no crontab yet; treat that as empty.
-other_entries() {
-    crontab -l 2>/dev/null | grep -vF "$MARKER" || true
+# The result is captured in full before `crontab -` runs, so reading and writing
+# the crontab never overlap.
+OTHER_ENTRIES=$(crontab -l 2>/dev/null | grep -vF "$MARKER" || true)
+
+write_crontab() {
+    {
+        if [ -n "$OTHER_ENTRIES" ]; then
+            printf '%s\n' "$OTHER_ENTRIES"
+        fi
+        if [ -n "${1:-}" ]; then
+            printf '%s\n' "$1"
+        fi
+    } | crontab -
 }
 
 case "${1:-}" in
     "") ;;
     --uninstall)
-        other_entries | crontab -
+        write_crontab
         echo "Removed the sittings cron entry."
         exit 0
         ;;
@@ -44,6 +55,6 @@ fi
 
 ENTRY="* * * * * \"$UV\" run --quiet --directory \"$REPO\" sittings 2>>\"$HOME/sittings.log\" $MARKER"
 
-{ other_entries; echo "$ENTRY"; } | crontab -
+write_crontab "$ENTRY"
 echo "Installed:"
 echo "$ENTRY"
