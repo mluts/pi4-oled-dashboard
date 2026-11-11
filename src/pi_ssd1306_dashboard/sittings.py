@@ -32,9 +32,10 @@ DEADLINE_SECONDS = 25
 
 SMALL_FONT_SIZE = 12
 MESSAGE_FONT_SIZE = 15
-# NOTE: largest size where "0:00" fits 124 px wide and leaves 2 px gaps to the
-# label and the bottom line (1-bit ink: 107x39 px).
-BIG_FONT_SIZE = 51
+# NOTE: largest size where "2h59" (widest, and "h" rises above the digits) fits
+# 124 px wide and leaves 2 px gaps to the label and the bottom line (1-bit ink:
+# 120x39 px).
+BIG_FONT_SIZE = 50
 
 _FONT_DATA = (files(__package__) / "fonts" / "DejaVuSans.ttf").read_bytes()
 # NOTE: Pillow reads a file object to the end, so each size gets its own stream.
@@ -143,9 +144,11 @@ def fetch_daily(config: Config) -> dict:
 
 def format_elapsed(minutes: int) -> str:
     hours, mins = divmod(minutes, 60)
+    if minutes < 60:
+        return f"{minutes}m"
     if minutes < HOURS_ONLY_FROM_MINS:
-        return f"{hours}:{mins:02d}"
-    return str(hours)
+        return f"{hours}h{mins:02d}"
+    return f"{hours}h"
 
 
 def _int(value) -> int:
