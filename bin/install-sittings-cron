@@ -1,0 +1,49 @@
+#!/bin/sh
+# Install (or with --uninstall, remove) the cron entry that runs `sittings`
+# every minute from this clone. Safe to re-run: it replaces its own entry and
+# leaves every other crontab line alone.
+set -eu
+
+MARKER='# pi-ssd1306-dashboard:sittings'
+REPO=$(cd "$(dirname "$0")/.." && pwd)
+
+usage() {
+    echo "usage: $0 [--uninstall]" >&2
+    exit 2
+}
+
+# NOTE: `crontab -l` fails when the user has no crontab yet; treat that as empty.
+other_entries() {
+    crontab -l 2>/dev/null | grep -vF "$MARKER" || true
+}
+
+case "${1:-}" in
+    "") ;;
+    --uninstall)
+        other_entries | crontab -
+        echo "Removed the sittings cron entry."
+        exit 0
+        ;;
+    *) usage ;;
+esac
+
+if [ ! -f "$REPO/sittings.toml" ]; then
+    echo "error: $REPO/sittings.toml not found." >&2
+    echo "Create it first: cp sittings.example.toml sittings.toml, then fill it in." >&2
+    exit 1
+fi
+
+UV=$(command -v uv || true)
+if [ -z "$UV" ] && [ -x "$HOME/.local/bin/uv" ]; then
+    UV="$HOME/.local/bin/uv"
+fi
+if [ -z "$UV" ]; then
+    echo "error: uv not found on PATH or in ~/.local/bin." >&2
+    exit 1
+fi
+
+ENTRY="* * * * * \"$UV\" run --quiet --directory \"$REPO\" sittings 2>>\"$HOME/sittings.log\" $MARKER"
+
+{ other_entries; echo "$ENTRY"; } | crontab -
+echo "Installed:"
+echo "$ENTRY"
