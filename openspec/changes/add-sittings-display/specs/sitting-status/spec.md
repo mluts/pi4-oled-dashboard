@@ -152,6 +152,31 @@ A single run SHALL finish within 30 seconds even when the API does not respond, 
 - **WHEN** the API accepts the connection but never answers
 - **THEN** the command gives up, shows `no network`, and exits with a non-zero status within 30 seconds
 
+### Requirement: Cron installer script
+The repository SHALL provide `bin/install-sittings-cron`, which installs a crontab entry that runs `sittings` every minute from the clone the script lives in, using absolute paths. Re-running it SHALL replace its own entry rather than add a second one, and it SHALL leave other crontab entries unchanged. `bin/install-sittings-cron --uninstall` SHALL remove only that entry. The script SHALL refuse to install while `sittings.toml` is missing.
+
+#### Scenario: Fresh install
+- **WHEN** the operator runs `bin/install-sittings-cron` on the Pi with `sittings.toml` in place
+- **THEN** the crontab contains exactly one entry that runs `sittings` every minute from that clone
+- **AND** the script prints the installed entry and exits with status 0
+
+#### Scenario: Re-running does not duplicate
+- **WHEN** the operator runs `bin/install-sittings-cron` a second time
+- **THEN** the crontab still contains exactly one `sittings` entry
+
+#### Scenario: Other entries are kept
+- **WHEN** the crontab already holds unrelated entries and the operator runs `bin/install-sittings-cron` or `bin/install-sittings-cron --uninstall`
+- **THEN** the unrelated entries are unchanged
+
+#### Scenario: Uninstall
+- **WHEN** the operator runs `bin/install-sittings-cron --uninstall`
+- **THEN** the `sittings` entry is removed from the crontab
+
+#### Scenario: Config missing
+- **WHEN** `sittings.toml` does not exist in the clone and the operator runs `bin/install-sittings-cron`
+- **THEN** the crontab is not changed
+- **AND** the script tells the operator to create `sittings.toml` from the example and exits with a non-zero status
+
 ### Requirement: Sittings failure when the panel is unreachable
 The `sittings` command, when not run with `--print`, SHALL exit with a non-zero status when it cannot open the I2C bus or reach the panel.
 

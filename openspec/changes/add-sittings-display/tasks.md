@@ -56,6 +56,12 @@
   - For `0m`, `59m`, `1h05`, `2h59`, `5h` and `23h`, the big text is centered within ±1 px, has at least 2 blank rows above and below, and stays inside the panel.
   - The message screens are still centered.
   - `uv run sittings --print` against the local API prints the new format.
+- [ ] 1.8 Add `bin/install-sittings-cron` (POSIX sh, executable) as design.md "`bin/install-sittings-cron`" describes, and change the README's cron section to use it, keeping the raw line as a fallback. Verify on the Mac without touching the real crontab: put a scratchpad stub `crontab` first on `PATH` that keeps its contents in a scratchpad file, then check that:
+  - With no crontab yet, install adds exactly one tagged entry, with absolute `uv` and clone paths.
+  - With an unrelated entry already present, install keeps it and adds one tagged entry.
+  - Running install again still leaves exactly one tagged entry.
+  - `--uninstall` removes only the tagged entry.
+  - A copy of the script in a scratchpad clone without `sittings.toml` exits non-zero and leaves the stub crontab unchanged.
 
 ## 2. Live API check (needs the API deployed)
 
@@ -74,8 +80,11 @@
 ## 3. On-device verification (performed by the user on the Pi)
 
 - [ ] 3.1 On the Pi, run `git pull`, create the config file as described in the README (with `chmod 600`), and run `uv run sittings`. Verify that the panel shows the big time and the `missing N` line, that the command exits 0, and that the frame stays on the panel after the prompt returns.
-- [ ] 3.2 Add the crontab line from the README with `crontab -e`. Verify that over the next 2–3 minutes the time on the panel updates without any manual run, and that `$HOME/sittings.log` stays empty.
-- [ ] 3.3 Temporarily change `url` in the Pi's config file to an unresolvable host, for example `https://sitting.invalid`. Verify that within a minute the panel shows `no network` and `$HOME/sittings.log` gets a line about it. Then restore the URL and verify that the status returns on the next run.
+- [ ] 3.2 Run `bin/install-sittings-cron`. If you added the raw line by hand earlier, remove it first with `crontab -e` so the job doesn't run twice. Verify that:
+  - `crontab -l` shows exactly one `sittings` entry.
+  - Over the next 2–3 minutes the time on the panel updates without any manual run.
+  - `$HOME/sittings.log` stays empty.
+- [ ] 3.3 Temporarily change `url` in the Pi's config file to an unresolvable host, for example `https://sitting.invalid`. Verify that within a minute the panel shows `no network` and `$HOME/sittings.log` gets a line about it. Then restore the URL and verify that the status returns on the next run. (`bin/install-sittings-cron --uninstall` removes the job if you ever need to stop it.)
 
 ## Workflow follow-up
 

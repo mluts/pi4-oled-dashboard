@@ -15,7 +15,8 @@ The sitting tracker at `https://sitting.lviv.social/` already knows how long it 
 - When no wakeup has been logged today, draw `no wakeup` and exit 0.
 - When a run cannot get fresh data, overwrite the panel with a short error (`no network`, `login failed`, `server 502`, `bad response`, `no config`) and exit non-zero. A stale frame never stays on the panel looking current.
 - Add a `--print` option. It writes the same text to the terminal instead of the panel and never opens I2C, so the command can be tested on the Mac.
-- README: document the config file and a crontab line for the Pi.
+- Add `bin/install-sittings-cron`, which installs (or with `--uninstall`, removes) the every-minute cron entry for this clone. It can be re-run safely and leaves other crontab entries alone.
+- README: document the config file, `bin/install-sittings-cron`, and the raw crontab line as a fallback.
 
 ## Capabilities
 
@@ -32,6 +33,6 @@ None. `oled-display` keeps its `hello` (and pending `splash`) requirements uncha
 - Code: a new module `src/pi_ssd1306_dashboard/sittings.py`. It reuses the DejaVu Sans font that `splash` already bundles in `src/pi_ssd1306_dashboard/fonts/`.
 - `pyproject.toml`: a new `sittings` entry under `[project.scripts]`. No new dependencies: HTTP uses `urllib.request` and the config uses `tomllib`, both from the standard library.
 - External API: depends on `https://sitting.lviv.social/api/v1/login` and `/api/v1/daily`, as described in `sittings/openapi.json`. The spec does not say how the token is sent. Bearer auth is assumed and will be checked against the live API once it is deployed.
-- Repository: a committed `sittings.example.toml`, and `/sittings.toml` added to `.gitignore`.
-- Pi setup: the operator copies the example to `sittings.toml` (chmod 600), fills it in, and adds a crontab entry. Both steps are documented, and neither is automated.
+- Repository: a committed `sittings.example.toml`, `/sittings.toml` added to `.gitignore`, and a new `bin/install-sittings-cron` script.
+- Pi setup: the operator copies the example to `sittings.toml` (chmod 600), fills it in, then runs `bin/install-sittings-cron`.
 - Docs: a new README section.
