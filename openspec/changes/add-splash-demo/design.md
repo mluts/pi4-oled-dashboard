@@ -77,10 +77,11 @@ Store `src/pi_ssd1306_dashboard/fonts/DejaVuSans.ttf` together with the DejaVu `
    - Compute `t = min(now - start, END)`.
    - Call `device.display(render(t))`.
    - Stop once `t == END`.
-   - Otherwise sleep until the next 1/30 s tick. If a frame took longer than a tick, skip the sleep.
+   - Otherwise sleep until the next 1/10 s tick. If a frame took longer than a tick, skip the sleep.
 4. Set `device.persist = True` and return.
 
 - *Why*: the final frame is always exactly `render(END)`, whatever frames were dropped along the way. Persistence works exactly as it does for `hello`.
+- *Why 10 fps*: the plan was 30 fps, but on the Pi this panel stayed dark while frames were sent back-to-back and showed only frames followed by an idle bus. The logs showed every frame went out (about 95 ms each at 100 kHz), so only the final frame was visible. With the bus at 400 kHz, a 10 fps target leaves idle time after each frame, and the full animation shows cleanly. 10 fps at 100 kHz is untested.
 
 ### GIF writer
 - Sample `render` at `dt = 0.04` s (40 ms). GIF frame delays are stored in hundredths of a second, so 40 ms is exact, while 1/30 s is not.

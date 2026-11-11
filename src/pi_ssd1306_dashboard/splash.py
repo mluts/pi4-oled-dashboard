@@ -25,7 +25,9 @@ END = 2.0
 MIN_FONT_SIZE = 4
 FINAL_FONT_SIZE = 15
 
-PANEL_FPS = 30
+# NOTE: back-to-back frames left this panel dark until the bus went idle; with
+# 400 kHz I2C, 10 fps leaves enough idle time per frame and animates cleanly.
+PANEL_FPS = 10
 GIF_FRAME_SECONDS = 0.04
 GIF_SCALE = 4
 GIF_FINAL_HOLD_SECONDS = 1.5
