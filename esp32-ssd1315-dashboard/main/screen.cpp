@@ -38,9 +38,13 @@ u8g2_t s_u8g2;
 uint8_t byte_cb(u8x8_t *, uint8_t msg, uint8_t arg_int, void *arg_ptr) {
   switch (msg) {
   case U8X8_MSG_BYTE_INIT: {
-    i2c_device_config_t dev_config = {.dev_addr_length = I2C_ADDR_BIT_LEN_7,
-                                      .device_address = CONFIG_DASH_I2C_ADDRESS,
-                                      .scl_speed_hz = CONFIG_DASH_I2C_FREQ_HZ};
+    i2c_device_config_t dev_config = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = CONFIG_DASH_I2C_ADDRESS,
+        .scl_speed_hz = CONFIG_DASH_I2C_FREQ_HZ,
+        .scl_wait_us = 0, // default, listed for completeness
+        .flags = {.disable_ack_check = false}, // default, listed for completeness
+    };
     esp_err_t err = i2c_master_bus_add_device(s_bus, &dev_config, &s_dev);
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "adding the panel at 0x%02x failed: %s",
@@ -108,7 +112,10 @@ esp_err_t init() {
       .scl_io_num = static_cast<gpio_num_t>(CONFIG_DASH_I2C_SCL),
       .clk_source = I2C_CLK_SRC_DEFAULT,
       .glitch_ignore_cnt = 7,
-      .flags = {.enable_internal_pullup = true},
+      .intr_priority = 0,     // default, listed for completeness
+      .trans_queue_depth = 0, // default, listed for completeness
+      .flags = {.enable_internal_pullup = true,
+                .allow_pd = false}, // default, listed for completeness
   };
   ESP_RETURN_ON_ERROR(i2c_new_master_bus(&bus_config, &s_bus), TAG,
                       "creating the i2c bus failed");
