@@ -2,7 +2,7 @@
 
 import pytest
 
-from conftest import WIDTH, Font, Panel
+from conftest import WIDTH, Band, Font, Panel
 
 ELAPSED = ["0m", "59m", "1h05", "2h59", "5h", "23h"]
 
@@ -50,12 +50,21 @@ def test_message_not_clipped(panel: Panel, line1: str, line2: str, prompt: bool)
     assert panel.message(line1, line2, prompt).ink() == expected
 
 
+def big_band(bands: list[Band]) -> Band:
+    """The elapsed time: the tallest band. The small lines can split into more
+    than one band (the dot of an i sits above an empty row)."""
+    return max(bands, key=lambda b: b.bottom - b.top)
+
+
 @pytest.mark.parametrize("elapsed", ELAPSED)
 def test_big_line_gaps_and_centred(panel: Panel, elapsed: str):
-    label, big, bottom = panel.status(elapsed, 2).bands()
+    bands = panel.status(elapsed, 2).bands()
+    big = big_band(bands)
+    above = max(b.bottom for b in bands if b.bottom < big.top)
+    below = min(b.top for b in bands if b.top > big.bottom)
 
-    assert big.top - label.bottom - 1 >= 2, "gap above the big line"
-    assert bottom.top - big.bottom - 1 >= 2, "gap below the big line"
+    assert big.top - above - 1 >= 2, "gap above the big line"
+    assert below - big.bottom - 1 >= 2, "gap below the big line"
     # NOTE: measured on the ink, not GetStrWidth: the advance width includes
     # the glyphs' empty side bearings.
     left, right = big.left, WIDTH - 1 - big.right
@@ -69,7 +78,7 @@ def test_layout_baselines(panel: Panel):
     assert first < second
     assert panel.prompt_baseline() < 8
 
-    # StatusLayout reserves only ascent + 1 rows for the big line because
-    # digits, h and m sit on the baseline.
-    big_band = panel.status("2h59", 2).bands()[1]
-    assert big_band.bottom == big
+    # What StatusLayout relies on (layout.cpp): u8g2 leaves the baseline row
+    # empty, and logisoso's round digits dip into it.
+    assert big_band(panel.status("2h59", 2).bands()).bottom == big - 1
+    assert big_band(panel.status("23h", 2).bands()).bottom == big

@@ -3,8 +3,11 @@
 namespace dash::layout {
 namespace {
 
-// The pixels the current font lights up around a baseline, in u8g2's terms:
-// ascent pixels up (positive), descent pixels down (descent is negative).
+// The rows the current font lights up around a baseline, in u8g2's terms:
+// ascent rows up (positive), descent rows down (descent is negative).
+// NOTE: u8g2 draws a glyph that sits on the baseline in the rows above it
+// (baseline - height .. baseline - 1, u8g2_font_decode_glyph), so the baseline
+// row stays empty and a descender ends at baseline - descent - 1.
 int top_pixel(u8g2_t &u8g2, int baseline)
 {
     return baseline - u8g2_GetAscent(&u8g2);
@@ -12,7 +15,7 @@ int top_pixel(u8g2_t &u8g2, int baseline)
 
 int bottom_pixel(u8g2_t &u8g2, int baseline)
 {
-    return baseline - u8g2_GetDescent(&u8g2);
+    return baseline - u8g2_GetDescent(&u8g2) - 1;
 }
 
 int baseline_for_top(u8g2_t &u8g2, int top)
@@ -22,13 +25,13 @@ int baseline_for_top(u8g2_t &u8g2, int top)
 
 int baseline_for_bottom(u8g2_t &u8g2, int bottom)
 {
-    return bottom + u8g2_GetDescent(&u8g2);
+    return bottom + u8g2_GetDescent(&u8g2) + 1;
 }
 
 // Height of the current font's full glyph box, descenders included.
 int box_height(u8g2_t &u8g2)
 {
-    return u8g2_GetAscent(&u8g2) - u8g2_GetDescent(&u8g2) + 1;
+    return u8g2_GetAscent(&u8g2) - u8g2_GetDescent(&u8g2);
 }
 
 }  // namespace
@@ -44,12 +47,15 @@ StatusLayout StatusLayout::from(u8g2_t &u8g2, const uint8_t *small, const uint8_
     int band_bottom = top_pixel(u8g2, bottom_baseline) - 1 - gap;
 
     u8g2_SetFont(&u8g2, big);
-    // NOTE: digits, "h" and "m" sit on the baseline, so only the ascent counts;
-    // the font's descent (for g, j, ...) would push the number up for nothing.
-    int big_height = u8g2_GetAscent(&u8g2) + 1;
+    // NOTE: the extent of what is drawn, not the font's box: logisoso's digits
+    // are one row taller than its ascent (the height of "A") and the round ones
+    // dip into the baseline row. The font's descent (for g, j, ...) would push
+    // the number up for nothing. test_draw.py checks this on real frames.
+    int above = u8g2_GetAscent(&u8g2) + 1; // rows above the baseline
+    int big_height = above + 1;            // plus the baseline row
     int band_height = band_bottom - band_top + 1;
     int big_top = band_top + (band_height - big_height) / 2;
-    int big_baseline = baseline_for_top(u8g2, big_top);
+    int big_baseline = big_top + above;
 
     u8g2_SetFont(&u8g2, small);
     return {label_baseline, big_baseline, bottom_baseline};
