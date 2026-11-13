@@ -1,0 +1,13 @@
+# Committed build defaults. idf.py merges them into the gitignored sdkconfig on
+# the first build; secrets (Wi-Fi passphrase, API token) go in via menuconfig and
+# never belong here. Pin and host defaults live in main/Kconfig.projbuild.
+CONFIG_IDF_TARGET="esp32c6"
+
+# The Waveshare ESP32-C6-Zero has 4 MB of flash; Wi-Fi + TLS + the certificate
+# bundle do not fit the 1 MB app partition of the plain single-app table.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
+# NOTE: the firmware has no clock source (no SNTP). TLS works only because
+# certificate validity dates are not checked; do not enable this option.
+# CONFIG_MBEDTLS_HAVE_TIME_DATE is not set
