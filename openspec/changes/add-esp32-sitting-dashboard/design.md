@@ -47,8 +47,9 @@ components/
   etl/                         wrapper component for the Embedded Template Library
 host_tests/
   shim.cpp                     extern "C" wrapper over status/layout/draw for ctypes
-  Makefile                     builds libdash_host.dylib into build/host_tests/
-  conftest.py                  runs make, loads the library, renders frames
+  CMakeLists.txt               builds libdash_host.dylib into build/host_tests/
+  .clangd                      points clangd at the host build's compile_commands.json
+  conftest.py                  configures and builds, loads the library, renders frames
   test_draw.py, test_status.py
 ```
 
@@ -161,12 +162,14 @@ Same rules as `sittings.py`:
 
 `host_tests/` checks the IDF-free modules on the Mac with pytest, from the repo's `.venv` (`pytest` and `pillow` in the root `pyproject.toml`'s dev group).
 
-- `Makefile` compiles u8g2's C sources, `layout.cpp`, `draw.cpp` and `shim.cpp` (and, from task 4.1, `status.cpp` and cJSON) with the system `cc`/`c++` into `build/host_tests/libdash_host.dylib`, against `managed_components/` and the ETL checkout in `build/esp-idf/etl/etl-src`, so one `idf.py build` must have run first. Make keeps the rebuild incremental; the u8g2 objects compile once.
+- `CMakeLists.txt` is a standalone CMake project (IDF scans only `main/` and `components/`, so it never picks it up), configured with Ninja into `build/host_tests/` and built with the system `cc`/`c++`. u8g2's graphics core (`u8g2_*.c`, `u8x8_*.c` from `managed_components/`, so one `idf.py build` must have run first) becomes a static library; `layout.cpp`, `draw.cpp` and `shim.cpp` (and, from task 4.1, `status.cpp` and cJSON) become `libdash_host.dylib`. ETL comes from its own `FetchContent` at the same tag `20.49.0`: its root `CMakeLists.txt` works as a plain CMake project here, outside IDF's script mode. CMake tracks header dependencies, so only what changed is rebuilt.
+- `CMAKE_EXPORT_COMPILE_COMMANDS` writes `build/host_tests/compile_commands.json`, and `host_tests/.clangd` points clangd at it, so the shim gets diagnostics from the Mac's clang instead of the IDF cross build's database.
 - `shim.cpp` is the only new C++: `draw_screen` and `screen_from_daily` take and return C++ types that ctypes cannot build, so it exposes a flat `extern "C"` API: set up a `u8g2_t` with byte and GPIO callbacks that accept everything, call `draw_init`, draw a status or message screen or one string at a given position, return the layouts and the frame buffer pointer, and (task 4.1) run `format_elapsed` and `screen_from_daily` into a plain C struct.
-- `conftest.py` runs `make` once per session, loads the library with `ctypes` and turns the 1 KB page buffer (8 pages × 128 columns, one byte per 8 vertical pixels, LSB on top) into a 128×64 grid. Each drawn frame is also saved as a scaled-up PNG under `build/host_tests/frames/` for viewing.
+- `conftest.py` runs `cmake -S … -B … -G Ninja` and `cmake --build` once per session (a no-op build when nothing changed), loads the library with `ctypes` and turns the 1 KB page buffer (8 pages × 128 columns, one byte per 8 vertical pixels, LSB on top) into a 128×64 grid. Each drawn frame is also saved as a scaled-up PNG under `build/host_tests/frames/` for viewing.
 - Checks on frames: nothing clipped (the frame's lit pixels equal the sum of each string drawn alone well inside the panel), the big line centred within ±1 px by its ink, and at least 2 empty rows between the big line and the lines above and below.
 - The four fonts move from `draw.cpp`'s anonymous namespace into `draw.hpp` (`dash::fonts`), so the painter and the tests cannot drift apart after a font change.
 - *Alternative*: a C++ test program in the scratchpad (the original plan). No new files in the repo, but it is thrown away, so nothing re-checks the layout after the font tuning on the real panel, and generating JSON bodies for task 4.1 is clumsier in C++.
+- *Alternative*: a plain `Makefile`. One command instead of two, but pattern rules, header dependency tracking and the object directory are written by hand, and it gives clangd nothing.
 - *Alternative*: GoogleTest or Catch2. A second test runner and a fetched dependency, when the repo already has Python tooling. `cffi`/`pybind11` instead of `ctypes`: extra dependencies for a dozen functions.
 
 ### Buttons
