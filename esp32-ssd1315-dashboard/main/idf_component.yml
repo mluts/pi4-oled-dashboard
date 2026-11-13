@@ -1,0 +1,11 @@
+## IDF Component Manager Manifest File
+dependencies:
+  idf: ">=6.0"
+  # NOTE: same commit as IDF 6.1's examples/peripherals/i2c/i2c_u8g2; u8g2 has
+  # no registry release, so it is pinned by git hash.
+  u8g2:
+    git: "https://github.com/olikraus/u8g2.git"
+    version: "a549a13b13b5fd568111557c1dd7ca3d06fbe21a"
+  # cJSON left the IDF core in 6.x.
+  espressif/cjson: "^1.7"
+  espressif/button: "^4"
