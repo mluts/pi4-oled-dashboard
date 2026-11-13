@@ -1,0 +1,4 @@
+# NOTE: the host build's database (Mac clang), written by CMake into
+# build/host_tests/; overrides the parent's IDF database for this folder.
+CompileFlags:
+  CompilationDatabase: ../build/host_tests
