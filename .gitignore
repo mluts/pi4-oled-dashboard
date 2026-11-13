@@ -11,3 +11,9 @@ wheels/
 
 # A filled-in copy of sittings.example.toml holds credentials
 /sittings.toml
+
+# ESP-IDF: sdkconfig holds the Wi-Fi passphrase and API token entered in
+# menuconfig; managed_components is fetched from dependencies.lock at build time
+/esp32-ssd1315-dashboard/sdkconfig
+/esp32-ssd1315-dashboard/sdkconfig.old
+/esp32-ssd1315-dashboard/managed_components/
