@@ -1,0 +1,9 @@
+# NOTE: generated from the active ESP-IDF environment. The paths include toolchain
+# versions, so run `idf-clangd-init --force` after an upgrade; that replaces this file.
+[language-server.clangd]
+command = "/Users/michael/.espressif/tools/esp-clangd/esp-21.1.3_20260408/esp-clangd/bin/clangd"
+args = [
+  "--background-index",
+  "--query-driver=/Users/michael/.espressif/tools/**/bin/*-elf-gcc,/Users/michael/.espressif/tools/**/bin/*-elf-g++",
+  "--resource-dir=/Users/michael/.espressif/tools/esp-clang/esp-21.1.3_20260408/esp-clang/lib/clang/21",
+]

@@ -17,3 +17,4 @@ wheels/
 /esp32-ssd1315-dashboard/sdkconfig
 /esp32-ssd1315-dashboard/sdkconfig.old
 /esp32-ssd1315-dashboard/managed_components/
+/esp32-ssd1315-dashboard/.cache/clangd/index
