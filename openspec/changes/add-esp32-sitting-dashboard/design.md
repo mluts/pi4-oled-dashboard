@@ -17,7 +17,7 @@ See proposal.md for the motivation and specs/esp32-sitting-dashboard/spec.md for
 
 **Goals:**
 - One event-driven main loop that owns the panel; every state the device can be in has a defined screen.
-- The decision logic (JSON → screen, elapsed formatting) is plain C with no IDF headers, so it can be compiled and checked on the Mac with the system compiler.
+- The decision logic (JSON → screen, elapsed formatting) and the screen layout and painting are C++ with no IDF headers, so they can be compiled and checked on the Mac with the system `c++`.
 - All app buffers static and sized once; no `malloc` in app code outside initialisation.
 - Minimal dependency surface: three managed components, otherwise IDF built-ins.
 
@@ -25,7 +25,7 @@ See proposal.md for the motivation and specs/esp32-sitting-dashboard/spec.md for
 - Pixel parity with the Pi's DejaVu rendering. u8g2 fonts of similar size are used; a custom converted font can come later.
 - Power management, deep sleep, burn-in mitigation.
 - Any write to the API; login on the device.
-- Host-side unit test infrastructure beyond compiling the pure module with `cc` from the scratchpad.
+- Host-side unit test infrastructure beyond compiling the IDF-free modules with `c++` from the scratchpad.
 
 ## Decisions
 
@@ -47,21 +47,22 @@ components/
   etl/                         wrapper component for the Embedded Template Library
 ```
 
-Everything is C++ (the project was meant to be created with `--cpp`): `extern "C"` appears only on `app_main` and on the callbacks that u8g2, iot_button and esp_event call back into. No exceptions, no RTTI, and no heap-owning standard containers; ETL's fixed-capacity types take that role. IDF 6.1 builds C++ as gnu++2b, so in-order designated initialisers fill the IDF config structs.
+Everything is C++ (the project was meant to be created with `--cpp`): `extern "C"` appears only on `app_main` and on the callbacks that u8g2, iot_button and esp_event call back into. No exceptions, no RTTI, and no heap-owning standard containers; ETL's fixed-capacity types take that role. IDF 6.1 builds C++ as gnu++26, so in-order designated initialisers fill the IDF config structs. IDF's `-Wextra -Werror` makes GCC reject a C++ designated initialiser that omits a field (`-Wmissing-field-initializers`), so every field is listed in declaration order; a field left at its zero default carries a comment saying it does not matter and is listed only so the initialiser is complete, e.g. `.scl_wait_us = 0, // default, listed for completeness`.
 
-`status` and `draw` have no IDF includes, so a scratchpad test compiles them on the Mac with `c++` against `managed_components/espressif__cjson`, `managed_components/u8g2/csrc`, the ETL include dir and `components/etl/profile`.
+`status`, `layout` and `draw` have no IDF includes, so a scratchpad test compiles them on the Mac with `c++` against `managed_components/espressif__cjson`, `managed_components/u8g2/csrc`, the ETL include dir and `components/etl/profile`.
 
 ### ETL (Embedded Template Library)
 
 The operator is learning ETL and the library matches the no-heap-in-app rule. It is used where it replaces something hand-rolled:
 
 - `etl::string<N>` for the screen texts (fixed capacity, `c_str()` for u8g2), `etl::string_view` for inputs, `etl::to_string`/`etl::format_spec` for numbers.
-- `etl::expected<Screen, Failure>` as the result of parsing and fetching, instead of out-parameters plus an error enum.
+- `etl::expected<Screen, FetchError>` as the result of parsing and fetching, instead of out-parameters plus an error enum.
 - `etl::span<char>` for the HTTP body buffer, `etl::delegate` where a callback is stored.
+- `etl::vector<uint8_t, 32>` for the I2C transfer the u8g2 byte callback collects, instead of an array plus a length; an overflow logs `vector_full` through the error handler and drops the chunk instead of writing past the buffer.
 - `etl::error_handler` with a callback that logs through `ESP_LOGE`; the profile enables `ETL_LOG_ERRORS`, `ETL_CHECK_PUSH_POP` and `ETL_VERBOSE_ERRORS`, so a bounds violation shows up in the monitor instead of being compiled out (exceptions stay off).
 - Not used for the main state machine or the event queue: the FreeRTOS queue is what lets the main task block, and a `switch` on an `enum class` is easier to read than `etl::fsm` for four states. `etl::fsm` can be a later refactor if the operator wants to try it.
 
-Packaging: ETL is header-only but its root `CMakeLists.txt` is a plain CMake project (`project()` + an INTERFACE target), not an IDF component. IDF includes every component's `CMakeLists.txt` in script mode during early expansion, where `project()` fails, and a component that never calls `idf_component_register` is dropped silently (`tools/cmake/build.cmake`, `__build_expand_requirements`). So a git dependency in `idf_component.yml` cannot work. `components/etl/CMakeLists.txt` instead uses CMake `FetchContent` to populate the ETL repository at tag `20.49.0` during the real configure pass (returning early in `CMAKE_BUILD_EARLY_EXPANSION`), and registers `<etl>/include` plus `components/etl/profile` (home of `etl_profile.h`, which ETL finds through the include path) as `INCLUDE_DIRS`. The clone lands in `build/_deps/etl-src`; `fullclean` re-fetches it.
+Packaging: ETL is header-only but its root `CMakeLists.txt` is a plain CMake project (`project()` + an INTERFACE target), not an IDF component. IDF includes every component's `CMakeLists.txt` in script mode during early expansion, where `project()` fails, and a component that never calls `idf_component_register` is dropped silently (`tools/cmake/build.cmake`, `__build_expand_requirements`). So a git dependency in `idf_component.yml` cannot work. `components/etl/CMakeLists.txt` instead uses CMake `FetchContent` to populate the ETL repository at tag `20.49.0` during the real configure pass (returning early in `CMAKE_BUILD_EARLY_EXPANSION`), and registers `<etl>/include` plus `components/etl/profile` (home of `etl_profile.h`, which ETL finds through the include path) as `INCLUDE_DIRS`. The clone lands in `build/esp-idf/etl/etl-src` (the direct form of `FetchContent_Populate` uses the component's binary directory, not `_deps`); `fullclean` re-fetches it.
 
 - *Alternative*: `marcel-cd/etlcpp` from the component registry. It wraps an unpinned ETL submodule, adds Xtensa compile flags and an `ExternalProject` build step that a header-only library does not need. Rejected.
 - *Alternative*: a git submodule under `components/etl/etl`. Browsable in the repo and no network at configure time, but the operator has to run `git submodule add` and every clone needs `--recursive`. FetchContent gives the same pinning with no extra step; switching later is a two-line change.
@@ -82,7 +83,7 @@ Packaging: ETL is header-only but its root `CMakeLists.txt` is a plain CMake pro
                                                +--------------------+
 ```
 
-- The main task is the only writer of the display and the only owner of the model (`screen_t current`, `bool prompt`, `wifi_state`). No mutex around u8g2.
+- The main task is the only writer of the display and the only owner of the model (`Screen current`, `bool prompt`, `wifi_state`). No mutex around u8g2.
 - The fetch runs in its own task so a 10-second request never blocks button handling or the Wi-Fi-down redraw. It idles on `ulTaskNotifyTake`; the main task notifies it for a scheduled tick, a confirmed refresh, or WIFI_UP. If a notification arrives while a fetch is running, FreeRTOS keeps it pending and the task fetches once more right after; fetches cannot overlap by construction.
 - Queue, task stacks and TCBs are created with the `*Static` FreeRTOS APIs; the two `esp_timer`s and the HTTP client handle are created once in `app_main`. After that the app code performs no allocation. Wi-Fi, lwIP, mbedTLS, cJSON and the button component allocate internally as they see fit.
 - *Alternative*: do the fetch inline in the main task. Simpler, but `refresh?` and `no wifi` would wait for a hung request to time out.
@@ -110,7 +111,7 @@ Screens are redrawn from the model (`current` + `prompt`), never patched, so the
 
 ### Panel: u8g2 over `esp_driver_i2c`
 
-- `u8g2_Setup_ssd1306_i2c_128x64_noname_f` with the byte callback and GPIO/delay callback from the IDF `i2c_u8g2` example (bus created with `i2c_new_master_bus`, device added in `U8X8_MSG_BYTE_INIT`, internal pull-ups on). The full-frame buffer lives inside the static `u8g2_t`.
+- `u8g2_Setup_ssd1306_i2c_128x64_noname_f` with the byte callback and GPIO/delay callback from the IDF `i2c_u8g2` example (bus created with `i2c_new_master_bus`, device added in `U8X8_MSG_BYTE_INIT`, internal pull-ups on). The setup points the static `u8g2_t` at u8g2's own static 1 KB frame buffer (`u8g2_m_16_8_f`), so the display needs no heap. Its transfer layer, `u8x8_cad_ssd13xx_fast_i2c`, sends at most 25 bytes per I2C transfer (24 data bytes plus the control byte), which the byte callback collects in a 32-byte `etl::vector`. `screen::init()` clears the controller RAM before switching the panel on, so power-up noise never shows, and returns `ESP_FAIL` when adding the I2C device failed (u8g2's calls return nothing, so it checks that the device handle was set); `screen::show(const Screen&, bool prompt)` is the only other entry point.
 - Fonts, chosen to keep the Pi's proportions on 64 pixels: `u8g2_font_helvR12_tr` for `since` and `missing N`, `u8g2_font_logisoso26_tr` for the big line (includes `h` and `m`), `u8g2_font_helvR14_tr` for centred messages (`no wakeup`, errors, boot texts), `u8g2_font_5x7_tr` for `refresh?`. These are starting candidates: two `helvR12` boxes (16 px each) plus 2 px gaps leave 28 px for the number, so `logisoso26` is the largest that fits. The task that places the text records the final choice here.
 - Vertical layout lives in `layout.hpp/.cpp` and is computed once at start-up, in u8g2's own vocabulary: `u8g2_SetFont` then `u8g2_GetAscent`/`u8g2_GetDescent` (descent is negative) for each font, with four small helpers (`top_pixel`, `bottom_pixel`, `baseline_for_top`, `baseline_for_bottom`) as the only place the descent sign is handled. `StatusLayout::from(u8g2, small, big, gap)` yields three named baselines: `since` flush with the top edge, `missing N` flush with the bottom edge, the big number centred in the band between them with at least `gap` (2) free pixels on each side. The big number reserves only `ascent + 1` pixels, because digits, `h` and `m` sit on the baseline and the font's descent would push it up for nothing. `MessageLayout::from(u8g2, message, small, gap)` yields a single centred baseline (full glyph box, descenders included) and two baselines for the SSID-over-`try N` block in the small font; `prompt_baseline` puts `refresh?` flush with the top edge. The painter in `draw.cpp` only sets the font, centres or right-aligns with `u8g2_GetStrWidth`, and draws at the named baseline. An SSID wider than the panel is cut by `u8g2_DrawStr`'s natural clipping, nothing is wrapped.
 - *Alternatives considered*: a generic band/placement layout engine (rejected: the three lines have fixed fonts, so there is no per-call variability to abstract), hardwired baseline constants (rejected: they still have to be derived from the same ascent/descent, so computing them once costs nothing and survives a font change), and a `FontMetrics` struct with renamed, sign-flipped fields (rejected: a second vocabulary for u8g2's ascent/descent).
@@ -138,9 +139,9 @@ Screens are redrawn from the model (`current` + `prompt`), never patched, so the
 
 The detail logged with `ESP_LOGW` is the `esp_err_t` name or the status code, never the header or the body.
 
-### JSON to screen (`status.c`)
+### JSON to screen (`status.cpp`)
 
-Same rules as `sittings.py`, in C:
+Same rules as `sittings.py`:
 
 1. `cJSON_ParseWithLength(body, len)`; failure → `bad response`.
 2. `stats` absent or not object/null → `bad response`; `stats` is JSON null → message `no wakeup`.
@@ -149,7 +150,7 @@ Same rules as `sittings.py`, in C:
 5. `format_elapsed(minutes)`: `<60` → `%dm`, `<180` → `%dh%02d`, else `%dh`.
 6. `cJSON_Delete` before returning. The tree is transient inside one fetch, so cJSON's heap use leaves nothing behind. (A static arena through `cJSON_InitHooks` was considered and dropped: the operator's rule is "libraries may allocate", and the arena would only add a failure mode.)
 
-`Screen` is a small value type: `kind` (status / message), `etl::string<7> elapsed`, `int missing`, `etl::string<32> line1`, `etl::string<15> line2` (the SSID and `try N` for the two-line boot screen). `screen_from_daily` returns `etl::expected<Screen, Failure>`; the main task copies the value into its model, nothing points into the parsed tree.
+`Screen` is a small value type: `kind` (status / message), `etl::string<7> elapsed`, `int missing`, `etl::string<32> line1`, `etl::string<15> line2` (the SSID and `try N` for the two-line boot screen). `screen_from_daily` returns `etl::expected<Screen, FetchError>`, where `FetchError` holds the kind (`no_network`, `bad_token`, `server`, `bad_response`), the HTTP status for `server`, and `text()` gives the panel line; the main task copies the value into its model, nothing points into the parsed tree.
 
 ### Buttons
 
