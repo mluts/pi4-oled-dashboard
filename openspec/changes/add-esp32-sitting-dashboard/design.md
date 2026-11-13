@@ -34,16 +34,37 @@ See proposal.md for the motivation and specs/esp32-sitting-dashboard/spec.md for
 ```
 main/
   esp32-ssd1315-dashboard.cpp  app_main: init order, event loop, state machine
-  status.c / status.h          pure C: daily JSON (cJSON) -> screen_t, format_elapsed
-  screen.c / screen.h          u8g2 setup on esp_driver_i2c; draw(screen_t, prompt)
-  net.c / net.h                wifi station + reconnect, posts WIFI_UP/WIFI_DOWN
-  fetch.c / fetch.h            esp_http_client GET -> static body buffer -> status.c
-  buttons.c / buttons.h        espressif/button handles, posts BTN_REFRESH
+  status.hpp / status.cpp      daily JSON (cJSON) -> Screen, format_elapsed; no IDF headers
+  layout.hpp / layout.cpp      baselines of every screen, computed once from the fonts' u8g2 metrics
+  draw.hpp / draw.cpp          paints a Screen into a u8g2 buffer at those baselines; no IDF headers
+  screen.hpp / screen.cpp      u8g2 setup on esp_driver_i2c, owns the u8g2_t
+  net.hpp / net.cpp            wifi station + reconnect, posts WIFI_UP/WIFI_DOWN
+  fetch.hpp / fetch.cpp        esp_http_client GET -> static body buffer -> status
+  buttons.hpp / buttons.cpp    espressif/button handles, posts BTN_REFRESH
   Kconfig.projbuild            the menuconfig options
   idf_component.yml            u8g2, espressif/cjson, espressif/button
+components/
+  etl/                         wrapper component for the Embedded Template Library
 ```
 
-`status.c` is the only module with behaviour worth checking off-device; it includes `cjson.h` and the C standard library and nothing else, so `cc -I managed_components/espressif__cjson status.c cJSON.c test.c` builds on the Mac.
+Everything is C++ (the project was meant to be created with `--cpp`): `extern "C"` appears only on `app_main` and on the callbacks that u8g2, iot_button and esp_event call back into. No exceptions, no RTTI, and no heap-owning standard containers; ETL's fixed-capacity types take that role. IDF 6.1 builds C++ as gnu++2b, so in-order designated initialisers fill the IDF config structs.
+
+`status` and `draw` have no IDF includes, so a scratchpad test compiles them on the Mac with `c++` against `managed_components/espressif__cjson`, `managed_components/u8g2/csrc`, the ETL include dir and `components/etl/profile`.
+
+### ETL (Embedded Template Library)
+
+The operator is learning ETL and the library matches the no-heap-in-app rule. It is used where it replaces something hand-rolled:
+
+- `etl::string<N>` for the screen texts (fixed capacity, `c_str()` for u8g2), `etl::string_view` for inputs, `etl::to_string`/`etl::format_spec` for numbers.
+- `etl::expected<Screen, Failure>` as the result of parsing and fetching, instead of out-parameters plus an error enum.
+- `etl::span<char>` for the HTTP body buffer, `etl::delegate` where a callback is stored.
+- `etl::error_handler` with a callback that logs through `ESP_LOGE`; the profile enables `ETL_LOG_ERRORS`, `ETL_CHECK_PUSH_POP` and `ETL_VERBOSE_ERRORS`, so a bounds violation shows up in the monitor instead of being compiled out (exceptions stay off).
+- Not used for the main state machine or the event queue: the FreeRTOS queue is what lets the main task block, and a `switch` on an `enum class` is easier to read than `etl::fsm` for four states. `etl::fsm` can be a later refactor if the operator wants to try it.
+
+Packaging: ETL is header-only but its root `CMakeLists.txt` is a plain CMake project (`project()` + an INTERFACE target), not an IDF component. IDF includes every component's `CMakeLists.txt` in script mode during early expansion, where `project()` fails, and a component that never calls `idf_component_register` is dropped silently (`tools/cmake/build.cmake`, `__build_expand_requirements`). So a git dependency in `idf_component.yml` cannot work. `components/etl/CMakeLists.txt` instead uses CMake `FetchContent` to populate the ETL repository at tag `20.49.0` during the real configure pass (returning early in `CMAKE_BUILD_EARLY_EXPANSION`), and registers `<etl>/include` plus `components/etl/profile` (home of `etl_profile.h`, which ETL finds through the include path) as `INCLUDE_DIRS`. The clone lands in `build/_deps/etl-src`; `fullclean` re-fetches it.
+
+- *Alternative*: `marcel-cd/etlcpp` from the component registry. It wraps an unpinned ETL submodule, adds Xtensa compile flags and an `ExternalProject` build step that a header-only library does not need. Rejected.
+- *Alternative*: a git submodule under `components/etl/etl`. Browsable in the repo and no network at configure time, but the operator has to run `git submodule add` and every clone needs `--recursive`. FetchContent gives the same pinning with no extra step; switching later is a two-line change.
 
 ### One main task, one event queue
 
@@ -90,8 +111,9 @@ Screens are redrawn from the model (`current` + `prompt`), never patched, so the
 ### Panel: u8g2 over `esp_driver_i2c`
 
 - `u8g2_Setup_ssd1306_i2c_128x64_noname_f` with the byte callback and GPIO/delay callback from the IDF `i2c_u8g2` example (bus created with `i2c_new_master_bus`, device added in `U8X8_MSG_BYTE_INIT`, internal pull-ups on). The full-frame buffer lives inside the static `u8g2_t`.
-- Fonts, chosen to match the Pi's proportions on 64 rows: `u8g2_font_helvR14_tr` for `since` and `missing N` (the Pi uses 17 px DejaVu), `u8g2_font_logisoso30_tr` for the big line (30 px, includes `h` and `m`), `u8g2_font_helvR14_tr` for centred messages (`no wakeup`, errors, boot texts), `u8g2_font_5x7_tr` for `refresh?`. The big line is centred with `u8g2_GetStrWidth`; the vertical band is what remains between the label's baseline and the bottom line's ascent, as on the Pi. If `2h59` turns out wider than 124 px or clips vertically at implementation time, step down one logisoso size and record it here.
-- Boot screens with two lines (SSID over `try N`) use the message font; an SSID longer than the panel is cut at the width with `u8g2_DrawStr`'s natural clipping, nothing is wrapped.
+- Fonts, chosen to keep the Pi's proportions on 64 pixels: `u8g2_font_helvR12_tr` for `since` and `missing N`, `u8g2_font_logisoso26_tr` for the big line (includes `h` and `m`), `u8g2_font_helvR14_tr` for centred messages (`no wakeup`, errors, boot texts), `u8g2_font_5x7_tr` for `refresh?`. These are starting candidates: two `helvR12` boxes (16 px each) plus 2 px gaps leave 28 px for the number, so `logisoso26` is the largest that fits. The task that places the text records the final choice here.
+- Vertical layout lives in `layout.hpp/.cpp` and is computed once at start-up, in u8g2's own vocabulary: `u8g2_SetFont` then `u8g2_GetAscent`/`u8g2_GetDescent` (descent is negative) for each font, with four small helpers (`top_pixel`, `bottom_pixel`, `baseline_for_top`, `baseline_for_bottom`) as the only place the descent sign is handled. `StatusLayout::from(u8g2, small, big, gap)` yields three named baselines: `since` flush with the top edge, `missing N` flush with the bottom edge, the big number centred in the band between them with at least `gap` (2) free pixels on each side. The big number reserves only `ascent + 1` pixels, because digits, `h` and `m` sit on the baseline and the font's descent would push it up for nothing. `MessageLayout::from(u8g2, message, small, gap)` yields a single centred baseline (full glyph box, descenders included) and two baselines for the SSID-over-`try N` block in the small font; `prompt_baseline` puts `refresh?` flush with the top edge. The painter in `draw.cpp` only sets the font, centres or right-aligns with `u8g2_GetStrWidth`, and draws at the named baseline. An SSID wider than the panel is cut by `u8g2_DrawStr`'s natural clipping, nothing is wrapped.
+- *Alternatives considered*: a generic band/placement layout engine (rejected: the three lines have fixed fonts, so there is no per-call variability to abstract), hardwired baseline constants (rejected: they still have to be derived from the same ascent/descent, so computing them once costs nothing and survives a font change), and a `FontMetrics` struct with renamed, sign-flipped fields (rejected: a second vocabulary for u8g2's ascent/descent).
 - *Alternative*: `esp_lcd` + LVGL, as in IDF's `i2c_oled` example. It adds a render task, a tick, and 200 KB of library to draw three strings.
 
 ### Wi-Fi
@@ -127,7 +149,7 @@ Same rules as `sittings.py`, in C:
 5. `format_elapsed(minutes)`: `<60` → `%dm`, `<180` → `%dh%02d`, else `%dh`.
 6. `cJSON_Delete` before returning. The tree is transient inside one fetch, so cJSON's heap use leaves nothing behind. (A static arena through `cJSON_InitHooks` was considered and dropped: the operator's rule is "libraries may allocate", and the arena would only add a failure mode.)
 
-`screen_t` is a small struct: `kind` (STATUS / MESSAGE), `elapsed[8]`, `missing`, `text[16]`. The main task copies it into its model; nothing points into the parsed tree.
+`Screen` is a small value type: `kind` (status / message), `etl::string<7> elapsed`, `int missing`, `etl::string<32> line1`, `etl::string<15> line2` (the SSID and `try N` for the two-line boot screen). `screen_from_daily` returns `etl::expected<Screen, Failure>`; the main task copies the value into its model, nothing points into the parsed tree.
 
 ### Buttons
 
@@ -145,10 +167,6 @@ Committed `sdkconfig.defaults`: `CONFIG_IDF_TARGET="esp32c6"`, `CONFIG_ESPTOOLPY
 
 *Alternative*: keep `sdkconfig` committed and put the secrets in a separate `sdkconfig.secrets` listed in `SDKCONFIG_DEFAULTS`. That splits one `menuconfig` session across two files and is easy to get wrong; a single ignored `sdkconfig` is the common IDF practice.
 
-### C++ entry point
-
-`app_main` stays in the existing `.cpp` so the project builds as generated; the other modules are C with `extern "C"` headers. Nothing in the app uses exceptions or RTTI.
-
 ## Risks / Trade-offs
 
 - [Flash] Wi-Fi + TLS + certificate bundle + u8g2 fonts may approach the 1.5 MB large app partition. → Check `idf.py size` after the first full build; `CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN` (common CAs only) and dropping unused u8g2 fonts (only the four named ones are linked) are the levers.
@@ -158,6 +176,7 @@ Committed `sdkconfig.defaults`: `CONFIG_IDF_TARGET="esp32c6"`, `CONFIG_ESPTOOLPY
 - [Heap over weeks] TLS handshakes every 30 s churn the heap. → Minimum free heap is logged after each fetch; the reused HTTP handle keeps lwIP/TLS allocations bounded. If fragmentation shows up, keep-alive or a longer interval are the knobs.
 - [Button task blocking] The button callback posts to the queue from the component's task; if the queue were full it would block that task. → Queue depth 8 with the main task draining promptly; a post uses a zero timeout and drops the press with a log line rather than blocking.
 - [Pin defaults] The C6-Zero pin facts come from the vendor wiki, not from the board in hand. → Defaults are `menuconfig` options; the README tells the operator to check them.
+- [ETL fetch needs the network] A fresh `build/` configures only with GitHub reachable. → The tag is pinned, so the result is reproducible; an offline build can point `FETCHCONTENT_SOURCE_DIR_ETL` at a local checkout.
 
 ## Migration Plan
 
