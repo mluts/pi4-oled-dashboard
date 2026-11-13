@@ -9,14 +9,6 @@ namespace {
 
 using layout::kPanelWidth;
 
-// NOTE: sizes chosen to keep the Pi's proportions (17 px label, 30 px DejaVu
-// digits, 15 px messages) on 64 pixels. u8g2 sizes count the whole glyph box,
-// so they come out smaller than Pillow's point sizes. Measured in task 2.1.
-constexpr const uint8_t *kFontSmall = u8g2_font_helvR12_tr;
-constexpr const uint8_t *kFontBig = u8g2_font_logisoso26_tr;
-constexpr const uint8_t *kFontMessage = u8g2_font_helvR14_tr;
-constexpr const uint8_t *kFontPrompt = u8g2_font_5x7_tr;
-
 constexpr const char *kLabel = "since";
 constexpr const char *kPrompt = "refresh?";
 
@@ -50,19 +42,19 @@ void draw_status(u8g2_t &u8g2, const Screen &screen)
     etl::string<24> missing{"missing "};
     etl::to_string(screen.missing, missing, true);
 
-    draw_left(u8g2, kFontSmall, s_status.label_baseline, kLabel);
-    draw_centered(u8g2, kFontBig, s_status.big_baseline, screen.elapsed.c_str());
-    draw_left(u8g2, kFontSmall, s_status.bottom_baseline, missing.c_str());
+    draw_left(u8g2, fonts::kSmall, s_status.label_baseline, kLabel);
+    draw_centered(u8g2, fonts::kBig, s_status.big_baseline, screen.elapsed.c_str());
+    draw_left(u8g2, fonts::kSmall, s_status.bottom_baseline, missing.c_str());
 }
 
 void draw_message(u8g2_t &u8g2, const Screen &screen)
 {
     if (screen.line2.empty()) {
-        draw_centered(u8g2, kFontMessage, s_message.single_baseline, screen.line1.c_str());
+        draw_centered(u8g2, fonts::kMessage, s_message.single_baseline, screen.line1.c_str());
         return;
     }
-    draw_centered(u8g2, kFontSmall, s_message.first_baseline, screen.line1.c_str());
-    draw_centered(u8g2, kFontSmall, s_message.second_baseline, screen.line2.c_str());
+    draw_centered(u8g2, fonts::kSmall, s_message.first_baseline, screen.line1.c_str());
+    draw_centered(u8g2, fonts::kSmall, s_message.second_baseline, screen.line2.c_str());
 }
 
 }  // namespace
@@ -70,9 +62,9 @@ void draw_message(u8g2_t &u8g2, const Screen &screen)
 void draw_init(u8g2_t &u8g2)
 {
     u8g2_SetFontPosBaseline(&u8g2);
-    s_status = layout::StatusLayout::from(u8g2, kFontSmall, kFontBig);
-    s_message = layout::MessageLayout::from(u8g2, kFontMessage, kFontSmall);
-    s_prompt_baseline = layout::prompt_baseline(u8g2, kFontPrompt);
+    s_status = layout::StatusLayout::from(u8g2, fonts::kSmall, fonts::kBig);
+    s_message = layout::MessageLayout::from(u8g2, fonts::kMessage, fonts::kSmall);
+    s_prompt_baseline = layout::prompt_baseline(u8g2, fonts::kPrompt);
 }
 
 void draw_screen(u8g2_t &u8g2, const Screen &screen, bool prompt)
@@ -87,7 +79,7 @@ void draw_screen(u8g2_t &u8g2, const Screen &screen, bool prompt)
         draw_message(u8g2, screen);
     }
     if (prompt) {
-        draw_right(u8g2, kFontPrompt, s_prompt_baseline, kPrompt);
+        draw_right(u8g2, fonts::kPrompt, s_prompt_baseline, kPrompt);
     }
     u8g2_SendBuffer(&u8g2);
 }
