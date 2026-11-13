@@ -17,7 +17,7 @@ See proposal.md for the motivation and specs/esp32-sitting-dashboard/spec.md for
 
 **Goals:**
 - One event-driven main loop that owns the panel; every state the device can be in has a defined screen.
-- The decision logic (JSON → screen, elapsed formatting) and the screen layout and painting are C++ with no IDF headers, so they can be compiled and checked on the Mac with the system `c++`.
+- The decision logic (JSON → screen, elapsed formatting) and the screen layout and painting are C++ with no IDF headers, so pytest can test them on the Mac through a small shared library (see "Host tests").
 - All app buffers static and sized once; no `malloc` in app code outside initialisation.
 - Minimal dependency surface: three managed components, otherwise IDF built-ins.
 
@@ -25,7 +25,7 @@ See proposal.md for the motivation and specs/esp32-sitting-dashboard/spec.md for
 - Pixel parity with the Pi's DejaVu rendering. u8g2 fonts of similar size are used; a custom converted font can come later.
 - Power management, deep sleep, burn-in mitigation.
 - Any write to the API; login on the device.
-- Host-side unit test infrastructure beyond compiling the IDF-free modules with `c++` from the scratchpad.
+- Host tests for the IDF-bound modules (`screen`, `net`, `fetch`, `buttons`); those are checked on the board.
 
 ## Decisions
 
@@ -45,11 +45,16 @@ main/
   idf_component.yml            u8g2, espressif/cjson, espressif/button
 components/
   etl/                         wrapper component for the Embedded Template Library
+host_tests/
+  shim.cpp                     extern "C" wrapper over status/layout/draw for ctypes
+  Makefile                     builds libdash_host.dylib into build/host_tests/
+  conftest.py                  runs make, loads the library, renders frames
+  test_draw.py, test_status.py
 ```
 
 Everything is C++ (the project was meant to be created with `--cpp`): `extern "C"` appears only on `app_main` and on the callbacks that u8g2, iot_button and esp_event call back into. No exceptions, no RTTI, and no heap-owning standard containers; ETL's fixed-capacity types take that role. IDF 6.1 builds C++ as gnu++26, so in-order designated initialisers fill the IDF config structs. IDF's `-Wextra -Werror` makes GCC reject a C++ designated initialiser that omits a field (`-Wmissing-field-initializers`), so every field is listed in declaration order; a field left at its zero default carries a comment saying it does not matter and is listed only so the initialiser is complete, e.g. `.scl_wait_us = 0, // default, listed for completeness`.
 
-`status`, `layout` and `draw` have no IDF includes, so a scratchpad test compiles them on the Mac with `c++` against `managed_components/espressif__cjson`, `managed_components/u8g2/csrc`, the ETL include dir and `components/etl/profile`.
+`status`, `layout` and `draw` have no IDF includes, so the host tests build them for the Mac (see "Host tests").
 
 ### ETL (Embedded Template Library)
 
@@ -152,6 +157,18 @@ Same rules as `sittings.py`:
 
 `Screen` is a small value type: `kind` (status / message), `etl::string<7> elapsed`, `int missing`, `etl::string<32> line1`, `etl::string<15> line2` (the SSID and `try N` for the two-line boot screen). `screen_from_daily` returns `etl::expected<Screen, FetchError>`, where `FetchError` holds the kind (`no_network`, `bad_token`, `server`, `bad_response`), the HTTP status for `server`, and `text()` gives the panel line; the main task copies the value into its model, nothing points into the parsed tree.
 
+### Host tests
+
+`host_tests/` checks the IDF-free modules on the Mac with pytest, from the repo's `.venv` (`pytest` and `pillow` in the root `pyproject.toml`'s dev group).
+
+- `Makefile` compiles u8g2's C sources, `layout.cpp`, `draw.cpp` and `shim.cpp` (and, from task 4.1, `status.cpp` and cJSON) with the system `cc`/`c++` into `build/host_tests/libdash_host.dylib`, against `managed_components/` and the ETL checkout in `build/esp-idf/etl/etl-src`, so one `idf.py build` must have run first. Make keeps the rebuild incremental; the u8g2 objects compile once.
+- `shim.cpp` is the only new C++: `draw_screen` and `screen_from_daily` take and return C++ types that ctypes cannot build, so it exposes a flat `extern "C"` API: set up a `u8g2_t` with byte and GPIO callbacks that accept everything, call `draw_init`, draw a status or message screen or one string at a given position, return the layouts and the frame buffer pointer, and (task 4.1) run `format_elapsed` and `screen_from_daily` into a plain C struct.
+- `conftest.py` runs `make` once per session, loads the library with `ctypes` and turns the 1 KB page buffer (8 pages × 128 columns, one byte per 8 vertical pixels, LSB on top) into a 128×64 grid. Each drawn frame is also saved as a scaled-up PNG under `build/host_tests/frames/` for viewing.
+- Checks on frames: nothing clipped (the frame's lit pixels equal the sum of each string drawn alone well inside the panel), the big line centred within ±1 px by its ink, and at least 2 empty rows between the big line and the lines above and below.
+- The four fonts move from `draw.cpp`'s anonymous namespace into `draw.hpp` (`dash::fonts`), so the painter and the tests cannot drift apart after a font change.
+- *Alternative*: a C++ test program in the scratchpad (the original plan). No new files in the repo, but it is thrown away, so nothing re-checks the layout after the font tuning on the real panel, and generating JSON bodies for task 4.1 is clumsier in C++.
+- *Alternative*: GoogleTest or Catch2. A second test runner and a fetched dependency, when the repo already has Python tooling. `cffi`/`pybind11` instead of `ctypes`: extra dependencies for a dozen functions.
+
 ### Buttons
 
 - `espressif/button`: one `iot_button_new_gpio_device` per configured GPIO, active low with the internal pull-up. The refresh button registers `BUTTON_PRESS_DOWN`; the callback posts `BTN_REFRESH` to the queue (the callback runs in the component's own task, so it may block briefly on the queue). The three spare buttons are created with no callbacks, which still configures and debounces the GPIO.
@@ -185,4 +202,4 @@ Additive. Deploy: `idf.py set-target esp32c6` (once), `idf.py menuconfig` to ent
 
 ## Open Questions
 
-- Which u8g2 font sizes make the layout look closest to the Pi on the real SSD1315 is a judgement call to make with the panel in hand; the candidates above are the starting point and the task that places the text records the final choice here.
+- Which u8g2 font sizes make the layout look closest to the Pi on the real SSD1315 is a judgement call to make with the panel in hand; the candidates above are the starting point and the task that places the text records the final choice here; the host tests re-check clipping, centring and gaps after each change.
