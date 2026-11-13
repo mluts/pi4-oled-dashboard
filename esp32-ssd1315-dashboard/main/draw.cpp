@@ -1,11 +1,17 @@
 #include "draw.hpp"
 
 #include "etl/to_string.h"
-#include "u8g2.h"
+
+#include "layout.hpp"
 
 namespace dash {
 namespace {
 
+using layout::kPanelWidth;
+
+// NOTE: sizes chosen to keep the Pi's proportions (17 px label, 30 px DejaVu
+// digits, 15 px messages) on 64 pixels. u8g2 sizes count the whole glyph box,
+// so they come out smaller than Pillow's point sizes. Measured in task 2.1.
 constexpr const uint8_t *kFontSmall = u8g2_font_helvR12_tr;
 constexpr const uint8_t *kFontBig = u8g2_font_logisoso26_tr;
 constexpr const uint8_t *kFontMessage = u8g2_font_helvR14_tr;
@@ -14,28 +20,76 @@ constexpr const uint8_t *kFontPrompt = u8g2_font_5x7_tr;
 constexpr const char *kLabel = "since";
 constexpr const char *kPrompt = "refresh?";
 
-void draw_centered(u8g2_t &u8g2, const char *text, int baseline) {
-  int width = u8g2_GetStrWidth(&u8g2, text);
-  int x = width >= kPanelWidth ? 0 : (kPanelWidth - width) / 2;
-  u8g2_DrawStr(&u8g2, x, baseline, text);
+layout::StatusLayout s_status;
+layout::MessageLayout s_message;
+int s_prompt_baseline;
+
+void draw_left(u8g2_t &u8g2, const uint8_t *font, int baseline, const char *text)
+{
+    u8g2_SetFont(&u8g2, font);
+    u8g2_DrawStr(&u8g2, 0, baseline, text);
 }
 
-void draw_status(u8g2_t &u8g2, const Screen &screen) {
-  etl::string<24> missing{"missing "};
-  etl::to_string(screen.sittings_missing, missing, true);
-
-  // Note: as on the Pi, the label hugs ther top edge and the bottom line the
-  // bottom edge;
-  // The big number is centered in the band between them.
-
-  u8g2_SetFont(&u8g2, kFontSmall);
-  int ascent = u8g2_GetAscent(&u8g2);
-  int descent = u8g2_GetDescent(&u8g2); // it's negative number, not positive
-  u8g2_DrawStr(&u8g2, 0, ascent, kLabel);
-  u8g2_DrawStr(&u8g2, 0, kPanelHeight - 1 + descent, missing.c_str());
-
-  int band_top = ascent + 1;
-  int band_bottom = kPanelHeight - 1 + descent - ascent;
+void draw_centered(u8g2_t &u8g2, const uint8_t *font, int baseline, const char *text)
+{
+    u8g2_SetFont(&u8g2, font);
+    int width = u8g2_GetStrWidth(&u8g2, text);
+    int x = width >= kPanelWidth ? 0 : (kPanelWidth - width) / 2;
+    u8g2_DrawStr(&u8g2, x, baseline, text);
 }
-} // namespace
-} // namespace dash
+
+void draw_right(u8g2_t &u8g2, const uint8_t *font, int baseline, const char *text)
+{
+    u8g2_SetFont(&u8g2, font);
+    int width = u8g2_GetStrWidth(&u8g2, text);
+    u8g2_DrawStr(&u8g2, kPanelWidth - width, baseline, text);
+}
+
+void draw_status(u8g2_t &u8g2, const Screen &screen)
+{
+    etl::string<24> missing{"missing "};
+    etl::to_string(screen.missing, missing, true);
+
+    draw_left(u8g2, kFontSmall, s_status.label_baseline, kLabel);
+    draw_centered(u8g2, kFontBig, s_status.big_baseline, screen.elapsed.c_str());
+    draw_left(u8g2, kFontSmall, s_status.bottom_baseline, missing.c_str());
+}
+
+void draw_message(u8g2_t &u8g2, const Screen &screen)
+{
+    if (screen.line2.empty()) {
+        draw_centered(u8g2, kFontMessage, s_message.single_baseline, screen.line1.c_str());
+        return;
+    }
+    draw_centered(u8g2, kFontSmall, s_message.first_baseline, screen.line1.c_str());
+    draw_centered(u8g2, kFontSmall, s_message.second_baseline, screen.line2.c_str());
+}
+
+}  // namespace
+
+void draw_init(u8g2_t &u8g2)
+{
+    u8g2_SetFontPosBaseline(&u8g2);
+    s_status = layout::StatusLayout::from(u8g2, kFontSmall, kFontBig);
+    s_message = layout::MessageLayout::from(u8g2, kFontMessage, kFontSmall);
+    s_prompt_baseline = layout::prompt_baseline(u8g2, kFontPrompt);
+}
+
+void draw_screen(u8g2_t &u8g2, const Screen &screen, bool prompt)
+{
+    u8g2_ClearBuffer(&u8g2);
+    u8g2_SetFontMode(&u8g2, 1);  // transparent glyph background
+    u8g2_SetDrawColor(&u8g2, 1);
+
+    if (screen.kind == ScreenKind::status) {
+        draw_status(u8g2, screen);
+    } else {
+        draw_message(u8g2, screen);
+    }
+    if (prompt) {
+        draw_right(u8g2, kFontPrompt, s_prompt_baseline, kPrompt);
+    }
+    u8g2_SendBuffer(&u8g2);
+}
+
+}  // namespace dash
