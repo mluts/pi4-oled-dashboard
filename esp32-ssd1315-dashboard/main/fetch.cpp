@@ -23,6 +23,10 @@ char s_body_storage[kBodyCapacity];
 etl::span<char> s_body{s_body_storage};
 size_t s_body_len;
 bool s_overflow; // the body did not fit: bad response
+// This request's status line, 0 while none arrived.
+// NOTE: not esp_http_client_get_status_code, whose value survives into a
+// request that never connected.
+int s_status;
 
 DoneCallback s_on_done;
 esp_http_client_handle_t s_client;
@@ -40,7 +44,9 @@ TaskHandle_t s_task;
 // NOTE: an overflow keeps returning ESP_OK so the client drains the connection;
 // an error here would abort the transfer and read as "no network".
 esp_err_t on_http_event(esp_http_client_event_t *e) {
-  if (e->event_id == HTTP_EVENT_ON_DATA) {
+  if (e->event_id == HTTP_EVENT_ON_STATUS_CODE) {
+    s_status = *static_cast<const int *>(e->data);
+  } else if (e->event_id == HTTP_EVENT_ON_DATA) {
     size_t len = static_cast<size_t>(e->data_len);
     if (s_overflow || len > s_body.size() - s_body_len) {
       s_overflow = true;
@@ -58,26 +64,29 @@ Result failed(FetchError::Kind kind, int http_status = 0) {
 
 // One request and its outcome, mapped as in design.md "HTTP fetch". The detail
 // logged is the esp_err_t name or the status code, never a header or the body.
+// NOTE: a status that arrived decides before perform's error: perform also
+// fails on a 401 without WWW-Authenticate (it tries its own authentication).
 Result perform() {
   s_body_len = 0;
   s_overflow = false;
+  s_status = 0;
   esp_err_t err = esp_http_client_perform(s_client);
-  int status = esp_http_client_get_status_code(s_client);
   // NOTE: a fresh connection per fetch, so a dropped keep-alive or a timed-out
   // request cannot leave the next one in a bad state.
   esp_http_client_close(s_client);
 
+  if (s_status == 401 || s_status == 403) {
+    ESP_LOGW(TAG, "token rejected: HTTP %d", s_status);
+    return failed(FetchError::Kind::bad_token);
+  }
+  if (s_status != 0 && (s_status < 200 || s_status > 299)) {
+    ESP_LOGW(TAG, "server error: HTTP %d", s_status);
+    return failed(FetchError::Kind::server, s_status);
+  }
+  // No status line, or a 2xx body that broke off.
   if (err != ESP_OK) {
     ESP_LOGW(TAG, "request failed: %s", esp_err_to_name(err));
     return failed(FetchError::Kind::no_network);
-  }
-  if (status == 401 || status == 403) {
-    ESP_LOGW(TAG, "token rejected: HTTP %d", status);
-    return failed(FetchError::Kind::bad_token);
-  }
-  if (status < 200 || status > 299) {
-    ESP_LOGW(TAG, "server error: HTTP %d", status);
-    return failed(FetchError::Kind::server, status);
   }
   if (s_overflow) {
     ESP_LOGW(TAG, "body over %u bytes", static_cast<unsigned>(kBodyCapacity));
