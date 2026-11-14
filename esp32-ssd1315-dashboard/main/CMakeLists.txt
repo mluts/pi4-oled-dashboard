@@ -1,4 +1,5 @@
 idf_component_register(SRCS "esp32-ssd1315-dashboard.cpp"
+                            "buttons.cpp"
                             "draw.cpp"
                             "fetch.cpp"
                             "layout.cpp"
