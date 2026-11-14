@@ -158,6 +158,120 @@ To add the entry by hand instead, open your crontab with `crontab -e` and add:
 
 Don't use both methods: the script only replaces entries it added itself.
 
+## ESP32-C6 variant
+
+`esp32-ssd1315-dashboard/` is standalone firmware that shows the same sitting status without a Pi or cron. It joins Wi-Fi, fetches the status every 30 seconds and keeps the panel up to date. It is an ESP-IDF project; the steps below run on a Mac.
+
+### Hardware
+
+- Waveshare ESP32-C6-Zero
+- SSD1315 OLED, 128x64, I2C at address `0x3C`
+- Four momentary buttons, each between a GPIO and GND (the internal pull-ups are used)
+
+| Part           | ESP32-C6-Zero |
+|----------------|---------------|
+| Panel VCC      | 3V3           |
+| Panel GND      | GND           |
+| Panel SDA      | GPIO 1        |
+| Panel SCL      | GPIO 0        |
+| Refresh button | GPIO 2        |
+| Spare button 1 | GPIO 3        |
+| Spare button 2 | GPIO 4        |
+| Spare button 3 | GPIO 5        |
+
+These are the defaults; every pin can be changed in `menuconfig`. Pins to avoid: GPIO 8 (on-board LED), 9 (BOOT button), 12 and 13 (USB), 16 and 17 (console UART). GPIO 4, 5, 8, 9 and 15 are strapping pins, read at reset: don't hold spare button 2 or 3 while the board resets.
+
+### One-time setup
+
+Install ESP-IDF 6.1 into `~/.espressif/v6.1/esp-idf`, then activate it in every new shell:
+
+```sh
+. ~/.espressif/v6.1/esp-idf/export.sh
+```
+
+In fish, use `source ~/.espressif/v6.1/esp-idf/export.fish` instead. Then set the target once:
+
+```sh
+cd esp32-ssd1315-dashboard
+idf.py set-target esp32c6
+```
+
+`set-target` regenerates `sdkconfig`, so run it before configuring, not after: it would erase the passphrase and the token.
+
+### Get an API token
+
+The device never logs in. It sends a token you get once from the Mac:
+
+```sh
+curl -s https://sitting.lviv.social/api/v1/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username": "you", "password": "your password"}'
+```
+
+The reply is `{"token": "…", "username": "you"}`; copy the token. The password ends up in your shell history, so clear that line afterwards if that matters to you.
+
+### Configure
+
+```sh
+idf.py menuconfig
+```
+
+Everything lives under **Sitting dashboard**. The values go into `sdkconfig`, which git ignores because it holds the Wi-Fi passphrase and the token. Only `sdkconfig.defaults` is committed.
+
+| Submenu             | Option (`CONFIG_DASH_…`) | Default               |
+|---------------------|--------------------------|-----------------------|
+| Panel               | `I2C_SDA`                | 1                     |
+| Panel               | `I2C_SCL`                | 0                     |
+| Panel               | `I2C_FREQ_HZ`            | 400000                |
+| Panel               | `I2C_ADDRESS`            | 0x3C                  |
+| Buttons             | `BTN_REFRESH_GPIO`       | 2                     |
+| Buttons             | `BTN_SPARE1_GPIO`        | 3                     |
+| Buttons             | `BTN_SPARE2_GPIO`        | 4                     |
+| Buttons             | `BTN_SPARE3_GPIO`        | 5                     |
+| Buttons             | `CONFIRM_MS`             | 1000                  |
+| Wi-Fi               | `WIFI_SSID`              | (empty)               |
+| Wi-Fi               | `WIFI_PASSWORD`          | (empty)               |
+| Sitting tracker API | `API_SCHEME_HTTPS` / `API_SCHEME_HTTP` (a choice) | https |
+| Sitting tracker API | `API_HOST`               | `sitting.lviv.social` |
+| Sitting tracker API | `API_PORT`               | 443                   |
+| Sitting tracker API | `API_TOKEN`              | (empty)               |
+| Sitting tracker API | `REFRESH_SECONDS`        | 30                    |
+
+Set at least the SSID, the passphrase and the token. HTTPS checks the server against the bundled certificate store but not the certificate dates, because the device has no clock; don't enable `CONFIG_MBEDTLS_HAVE_TIME_DATE` without adding SNTP.
+
+### Flash
+
+```sh
+idf.py flash monitor
+```
+
+The serial port is found automatically when one board is connected; add `-p /dev/cu.usbmodem…` to pick one. `Ctrl+]` leaves the monitor. The monitor logs each stage, every fetch with the minimum free heap, and the error details. It never logs the token.
+
+### What the panel shows
+
+On boot: `booting`, then the Wi-Fi SSID (with `try 2`, `try 3`, … while it retries), then `fetching`, then the same status screen as `sittings`. It refreshes every 30 seconds without flicker; the old numbers stay until the new ones arrive.
+
+Press the refresh button once and `refresh?` appears in the top-right corner. Press it again within a second to fetch right away; otherwise the prompt goes away. The other three buttons do nothing yet.
+
+| Panel text     | Meaning                                                    |
+|----------------|------------------------------------------------------------|
+| `no config`    | The SSID or the token is empty in `menuconfig`             |
+| `no wifi`      | The Wi-Fi link is down; it reconnects by itself            |
+| `no network`   | The server can't be reached or didn't answer within 10 s   |
+| `bad token`    | The server rejected the token (HTTP 401 or 403)            |
+| `server 502`   | The server returned another error status (here 502)        |
+| `bad response` | The reply wasn't the expected JSON, or was over 16 KB      |
+
+### Host tests
+
+The layout and the JSON handling are also built for the Mac and checked with pytest. After one `idf.py build`, with the ESP-IDF environment active, run from the repository root:
+
+```sh
+.venv/bin/pytest esp32-ssd1315-dashboard/host_tests
+```
+
+Each test screen is also saved as a PNG under `esp32-ssd1315-dashboard/build/host_tests/frames/`.
+
 ## Dev loop
 
 1. Edit on the dev machine. `uv sync` there gives the editor the dependencies.
