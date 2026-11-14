@@ -1,7 +1,10 @@
 // Flat C API over the IDF-free modules, for the pytest suite to call through
-// ctypes. Built for the Mac by the Makefile next to this file.
+// ctypes. Built for the Mac by the CMakeLists.txt next to this file.
+#include <cstdio>
+
 #include "draw.hpp"
 #include "layout.hpp"
+#include "status.hpp"
 #include "u8g2.h"
 
 namespace {
@@ -22,6 +25,16 @@ const uint8_t *const kFonts[] = {dash::fonts::kSmall, dash::fonts::kBig,
                                  dash::fonts::kMessage, dash::fonts::kPrompt};
 
 } // namespace
+
+// What dash_screen_from_daily fills in; conftest.py's DashResult mirrors this
+// layout field by field.
+struct DashResult {
+  int kind; // 0 status, 1 message
+  char elapsed[8];
+  int missing;
+  char line1[33];
+  char error[16]; // FetchError::text(), when there is no screen
+};
 
 extern "C" {
 
@@ -78,6 +91,28 @@ int dash_draw_text(int font, int x, int baseline, const char *text) {
   u8g2_SetFont(&s_u8g2, kFonts[font]);
   u8g2_DrawStr(&s_u8g2, x, baseline, text);
   return u8g2_GetStrWidth(&s_u8g2, text);
+}
+
+// out holds at least 8 bytes.
+void dash_format_elapsed(int minutes, char *out) {
+  std::snprintf(out, 8, "%s", dash::format_elapsed(minutes).c_str());
+}
+
+// 1 with a screen in out, 0 with the error text in out->error.
+int dash_screen_from_daily(const char *body, int len, DashResult *out) {
+  *out = DashResult{};
+  auto result = dash::screen_from_daily(etl::string_view(body, len));
+  if (!result.has_value()) {
+    std::snprintf(out->error, sizeof out->error, "%s",
+                  result.error().text().c_str());
+    return 0;
+  }
+  const dash::Screen &s = result.value();
+  out->kind = s.kind == dash::ScreenKind::status ? 0 : 1;
+  std::snprintf(out->elapsed, sizeof out->elapsed, "%s", s.elapsed.c_str());
+  out->missing = s.missing;
+  std::snprintf(out->line1, sizeof out->line1, "%s", s.line1.c_str());
+  return 1;
 }
 
 } // extern "C"

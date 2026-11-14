@@ -29,12 +29,20 @@ target_compile_options(u8g2 PRIVATE -w)
 # Linked into a shared library; the macOS default already, not on Linux.
 set_target_properties(u8g2 PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+# Vendored like u8g2: the same cJSON the firmware gets from the component
+# manager.
+set(CJSON ${ROOT}/managed_components/espressif__cjson/cJSON)
+add_library(cjson STATIC ${CJSON}/cJSON.c)
+target_include_directories(cjson PUBLIC ${CJSON})
+target_compile_options(cjson PRIVATE -w)
+set_target_properties(cjson PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 # What conftest.py loads with ctypes. No -Werror: the firmware build with GCC
 # is the strict one, the Mac's clang warns about different things.
 add_library(dash_host SHARED ${ROOT}/main/layout.cpp ${ROOT}/main/draw.cpp
-                             shim.cpp)
+                             ${ROOT}/main/status.cpp shim.cpp)
 target_compile_features(dash_host PRIVATE cxx_std_23)
 target_compile_options(dash_host PRIVATE -Wall -Wextra)
 target_include_directories(dash_host PRIVATE ${ROOT}/main
                                              ${ROOT}/components/etl/profile)
-target_link_libraries(dash_host PRIVATE u8g2 etl::etl)
+target_link_libraries(dash_host PRIVATE u8g2 cjson etl::etl)
