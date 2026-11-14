@@ -1,9 +1,14 @@
+#include <cstdio>
+#include <type_traits>
+
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "etl/error_handler.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "sdkconfig.h"
 
+#include "fetch.hpp"
 #include "net.hpp"
 #include "screen.hpp"
 #include "status.hpp"
@@ -19,14 +24,27 @@ void on_etl_error(const etl::exception &e)
 }
 
 // What the main task reacts to. Producers join as their tasks add them.
-enum class EventKind { wifi_up, wifi_down };
+enum class EventKind { wifi_up, wifi_down, tick, fetch_done };
 
-// NOTE: copied byte by byte through the FreeRTOS queue, so it must stay
-// trivially copyable (no etl::string here; see FETCH_DONE in task 4.2).
+// A fetch result as plain data; the main task rebuilds the Screen from it.
+// NOTE: an etl::string keeps a pointer to its own buffer, so a Screen cannot
+// travel through the queue's byte copy.
+struct FetchOutcome {
+  bool ok;
+  dash::ScreenKind kind;
+  char elapsed[8];
+  int missing;
+  char line1[33]; // "no wakeup"
+  dash::FetchError error;
+};
+
 struct Event {
   EventKind kind;
-  int attempt; // wifi_down: failed attempts so far
+  int attempt;        // wifi_down: failed attempts so far
+  FetchOutcome fetch; // fetch_done
 };
+// Copied byte by byte through the FreeRTOS queue.
+static_assert(std::is_trivially_copyable_v<Event>);
 
 constexpr int kQueueDepth = 8;
 StaticQueue_t s_queue_tcb;
@@ -37,8 +55,47 @@ QueueHandle_t s_queue;
 // wifi_up would leave the SSID on the panel for good, and the main task does
 // nothing but drain the queue.
 void on_link(bool up, int attempt) {
-  Event e{up ? EventKind::wifi_up : EventKind::wifi_down, attempt};
+  Event e{};
+  e.kind = up ? EventKind::wifi_up : EventKind::wifi_down;
+  e.attempt = attempt;
   xQueueSend(s_queue, &e, portMAX_DELAY);
+}
+
+// fetch's DoneCallback, in the fetch task. Waits for the same reason: a lost
+// result would leave a stale screen up.
+void on_fetch_done(const dash::fetch::Result &result) {
+  Event e{};
+  e.kind = EventKind::fetch_done;
+  FetchOutcome &o = e.fetch;
+  o.ok = result.has_value();
+  if (o.ok) {
+    const dash::Screen &s = result.value();
+    o.kind = s.kind;
+    std::snprintf(o.elapsed, sizeof o.elapsed, "%s", s.elapsed.c_str());
+    o.missing = s.missing;
+    std::snprintf(o.line1, sizeof o.line1, "%s", s.line1.c_str());
+  } else {
+    o.error = result.error();
+  }
+  xQueueSend(s_queue, &e, portMAX_DELAY);
+}
+
+// The refresh timer, in the esp_timer task. A tick dropped on a full queue is
+// harmless: the next one follows an interval later.
+void on_tick(void *) {
+  Event e{};
+  e.kind = EventKind::tick;
+  xQueueSend(s_queue, &e, 0);
+}
+
+dash::Screen screen_from(const FetchOutcome &o) {
+  if (!o.ok) {
+    return dash::Screen::message(o.error.text());
+  }
+  if (o.kind == dash::ScreenKind::status) {
+    return dash::Screen::status(o.elapsed, o.missing);
+  }
+  return dash::Screen::message(o.line1);
 }
 
 enum class State { connecting, online, offline };
@@ -78,9 +135,27 @@ extern "C" void app_main(void) {
   s_queue = xQueueCreateStatic(kQueueDepth, sizeof(Event), s_queue_storage,
                                &s_queue_tcb);
   dash::screen::show(connecting(0), false);
+  // NOTE: fetch before net, so the fetch task exists when the first wifi_up
+  // asks for a fetch.
+  if (dash::fetch::start(dash::fetch::DoneCallback::create<on_fetch_done>()) !=
+      ESP_OK) {
+    return; // fetch.cpp has logged which step failed
+  }
   if (dash::net::start(dash::net::LinkCallback::create<on_link>()) != ESP_OK) {
     return; // net.cpp has logged which step failed
   }
+
+  const esp_timer_create_args_t tick_args = {
+      .callback = on_tick,
+      .arg = nullptr,
+      .dispatch_method = ESP_TIMER_TASK,
+      .name = "tick",
+      .skip_unhandled_events = true, // no burst of ticks after a stall
+  };
+  esp_timer_handle_t tick;
+  ESP_ERROR_CHECK(esp_timer_create(&tick_args, &tick));
+  ESP_ERROR_CHECK(esp_timer_start_periodic(
+      tick, static_cast<uint64_t>(CONFIG_DASH_REFRESH_SECONDS) * 1000000));
 
   // From here the main task is the event loop and the only one that draws.
   // Every event redraws from the model, never patches the panel.
@@ -93,8 +168,20 @@ extern "C" void app_main(void) {
     case EventKind::wifi_up:
       if (state == State::connecting) {
         current = dash::Screen::message("fetching");
-      } // offline: "no wifi" stays until FETCH_DONE (task 4.2)
+      } // offline: "no wifi" stays until the result replaces it
       state = State::online;
+      dash::fetch::now();
+      break;
+    case EventKind::tick:
+      if (state == State::online) {
+        dash::fetch::now();
+      }
+      continue; // the numbers stay until the result
+    case EventKind::fetch_done:
+      if (state != State::online) {
+        continue; // the link dropped meanwhile: "no wifi" stays
+      }
+      current = screen_from(e.fetch);
       break;
     case EventKind::wifi_down:
       if (state == State::connecting) {
