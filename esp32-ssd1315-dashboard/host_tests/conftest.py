@@ -71,6 +71,18 @@ class Frame:
         image.resize((WIDTH * scale, HEIGHT * scale), Image.NEAREST).save(path)
 
 
+class DashResult(ctypes.Structure):
+    """Mirrors DashResult in shim.cpp, field by field."""
+
+    _fields_ = [
+        ("kind", ctypes.c_int),  # 0 status, 1 message
+        ("elapsed", ctypes.c_char * 8),
+        ("missing", ctypes.c_int),
+        ("line1", ctypes.c_char * 33),
+        ("error", ctypes.c_char * 16),
+    ]
+
+
 def _declare(lib: ctypes.CDLL) -> None:
     """Argument and return types of shim.cpp's functions; ctypes would assume
     int everywhere, which truncates the buffer pointer."""
@@ -91,6 +103,14 @@ def _declare(lib: ctypes.CDLL) -> None:
     lib.dash_prompt_baseline.restype = ctypes.c_int
     lib.dash_draw_text.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_char_p]
     lib.dash_draw_text.restype = ctypes.c_int
+    lib.dash_format_elapsed.argtypes = [ctypes.c_int, ctypes.c_char_p]
+    lib.dash_format_elapsed.restype = None
+    lib.dash_screen_from_daily.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.POINTER(DashResult),
+    ]
+    lib.dash_screen_from_daily.restype = ctypes.c_int
 
 
 @pytest.fixture(scope="session")
