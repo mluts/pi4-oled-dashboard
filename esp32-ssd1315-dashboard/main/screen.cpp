@@ -120,6 +120,17 @@ esp_err_t init() {
   ESP_RETURN_ON_ERROR(i2c_new_master_bus(&bus_config, &s_bus), TAG,
                       "creating the i2c bus failed");
 
+  // NOTE: adding the device never touches the bus, so without this a missing
+  // panel only shows up as one failed transfer per command.
+  esp_err_t err =
+      i2c_master_probe(s_bus, CONFIG_DASH_I2C_ADDRESS, kI2CTimeoutMs);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "no panel answers at 0x%02x on SDA %d / SCL %d: %s",
+             CONFIG_DASH_I2C_ADDRESS, CONFIG_DASH_I2C_SDA, CONFIG_DASH_I2C_SCL,
+             esp_err_to_name(err));
+    return err;
+  }
+
   u8g2_Setup_ssd1306_i2c_128x64_noname_f(&s_u8g2, U8G2_R0, byte_cb,
                                          gpio_delay_cb);
   u8g2_InitDisplay(&s_u8g2);
