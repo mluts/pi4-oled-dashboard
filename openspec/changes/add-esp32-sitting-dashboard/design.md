@@ -133,7 +133,7 @@ Screens are redrawn from the model (`current` + `prompt`), never patched, so the
 
 - URL built once at boot into a static buffer: `"%s://%s:%d/api/v1/daily"`. `esp_http_client_init` once with `timeout_ms = 10000`, `crt_bundle_attach = esp_crt_bundle_attach` (ignored for `http`), an event handler and `user_data` pointing at the body accumulator. `Authorization: Bearer <token>` is set with `esp_http_client_set_header` at init; the handle is reused for every `esp_http_client_perform`.
 - Body accumulator: a static 16 KB buffer plus a length. `HTTP_EVENT_ON_DATA` appends; an overflow sets a flag that maps to `bad response` after `perform` returns. 16 KB covers 100 sittings twice over.
-- Timing: the 10 s client timeout applies to connect, TLS and each read, so a server that accepts and hangs fails within 10 s. The spec's 15 s bound leaves room for DNS. The fetch task also resets the task watchdog subscription it holds around each `perform`.
+- Timing: the 10 s client timeout applies to connect, TLS and each read, so a server that accepts and hangs fails within 10 s. The spec's 15 s bound leaves room for DNS. The fetch task does not subscribe to the task watchdog: while `perform` waits it is blocked on the network, so the idle task the watchdog watches keeps running.
 - Error mapping, mirroring the Pi's:
 
 | `esp_http_client_perform` outcome                                  | Panel text      |
@@ -142,6 +142,8 @@ Screens are redrawn from the model (`current` + `prompt`), never patched, so the
 | status 401 or 403                                                  | `bad token`     |
 | any other status outside 200–299                                   | `server <code>` |
 | overflowed body, `cJSON_Parse` fails, `stats` missing or mistyped  | `bad response`  |
+
+`esp_http_client_perform` also fails on a 401 without a `WWW-Authenticate` header (it tries its own authentication), and its stored status code survives into a request that never connected; so the fetch records the status from `HTTP_EVENT_ON_STATUS_CODE`, and a status that arrived decides before `perform`'s error does. The error row applies only when no status line arrived, or a 2xx body broke off.
 
 The detail logged with `ESP_LOGW` is the `esp_err_t` name or the status code, never the header or the body.
 
@@ -190,7 +192,7 @@ Committed `sdkconfig.defaults`: `CONFIG_IDF_TARGET="esp32c6"`, `CONFIG_ESPTOOLPY
 
 ## Risks / Trade-offs
 
-- [Flash] Wi-Fi + TLS + certificate bundle + u8g2 fonts may approach the 1.5 MB large app partition. → Check `idf.py size` after the first full build; `CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN` (common CAs only) and dropping unused u8g2 fonts (only the four named ones are linked) are the levers.
+- [Flash] Wi-Fi + TLS + certificate bundle + u8g2 fonts may approach the 1.5 MB large app partition. → Check `idf.py size` after the first full build; `CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN` (common CAs only) and dropping unused u8g2 fonts (only the four named ones are linked) are the levers. Measured in task 4.3 with fetch, Wi-Fi and TLS in: the app is 1,179,840 bytes (`0x1200C0`) of the 1,536,000-byte partition, 356,160 bytes (23 %) free. The board's ESP32-C6FH8 has 8 MB of flash, not the wiki's 4 MB, so a larger partition is a further lever if the app ever outgrows this one.
 - [TLS date check] If `CONFIG_MBEDTLS_HAVE_TIME_DATE` is ever enabled, TLS fails until the clock is set. → A NOTE in `sdkconfig.defaults` and the README; SNTP is a later change if wanted.
 - [Response growth] A day with more than ~200 sittings would overflow the 16 KB buffer and show `bad response`. → Out of range for a real day; the buffer size is one constant.
 - [Token lifetime] If the server expires tokens, the panel shows `bad token` until the operator issues a new one and reflashes. → Accepted for now; login on the device is deferred until the endpoint stabilises.
